@@ -1,0 +1,81 @@
+.target-ignore-element-outline {
+    border: 2px solid #0055FF;
+    outline: 2px dashed #00AAFF;
+}
+
+#shadowdom-vr-reader.vr-shadowdom {
+    display: block !important;
+}
+
+#shadowdom-modal-large,
+#shadowdom-highlight-prompt,
+#shadowdom-vrr-toast {
+    display: block !important;
+}
+
+#shadowdom-toast {
+    display: block !important;
+}
+
+mark.text-fragments-vrr {
+    /* Existing styles */
+    background-color: transparent !important;
+    transition: background-color 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+    color: inherit !important;
+    display: inline !important;
+    white-space: inherit !important;
+
+
+    /* NEW: Prevent layout shifts */
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+
+    /* Crucial for preventing line-height jumps */
+    line-height: inherit !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+    font-style: inherit !important;
+    font-weight: inherit !important;
+    vertical-align: baseline !important;
+
+    /* Inherit text-level properties from the parent element so highlighted
+       text looks identical to the surrounding paragraph (including host-page
+       rules like text-transform) */
+    text-transform: inherit !important;
+    letter-spacing: inherit !important;
+    word-spacing: inherit !important;
+    text-decoration: inherit !important;
+    text-shadow: inherit !important;
+
+
+    /* Ensure no extra box shadows or outlines affect size */
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+mark.text-fragments-vrr.vrr-highlight-on {
+    /* background-color:  #3165D0;
+    color:white;    */
+}
+
+.text-base {
+    position: relative;
+}
+
+mark.text-fragments-vrr.vrr-streaming {
+    background-color: transparent !important;
+}
+
+mark.text-fragments-vrr.vrr-highlight-pending {
+    /* Pending/preloaded highlights must look identical to normal page text.
+       The base .text-fragments-vrr rules already make the mark transparent
+       and inherit all typography, so no extra styling is needed here. */
+    pointer-events: none !important;
+}
+
+.ai-highlight-marker {
+    background-color: transparent !important;
+    position: absolute !important;
+    z-index: -1 !important;
+}

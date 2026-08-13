@@ -1,0 +1,6 @@
+.history
+*.zip
+node_modules/
+dist/
+node_modules/*/package.json
+.env

@@ -1,0 +1,109 @@
+{
+    "name": "VoiceRankings Reader: Text to Speech (BYOK)",
+    "icons": {
+        "128": "images/logo.png"
+    },
+    "manifest_version": 3,
+    "version": "4.0.0",
+    "description": "A 100% free, open-source text-to-speech reader. Bring your own key (OpenAI, Google & more). Listen to premium voices with no subscription.",
+    "permissions": [
+        "sidePanel",
+        "storage",
+        "activeTab",
+        "contextMenus",
+        "offscreen"
+    ],
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
+    "options_page": "sidepanel.html",
+    "action": {
+        "default_title": "VoiceRankings Reader",
+        "default_icon": {
+            "128": "images/logo.png"
+        }
+    },
+    "commands": {
+        "playback-pause-play": {
+            "suggested_key": {
+                "default": "Ctrl+Space"
+            },
+            "description": "Playback Stop/Play"
+        },
+        "playback-next-line": {
+            "suggested_key": {
+                "default": "Alt+D"
+            },
+            "description": "Playback Next Line"
+        },
+        "playback-previous-line": {
+            "suggested_key": {
+                "default": "Alt+A"
+            },
+            "description": "Playback Previous Line"
+        },
+        "auto-start-reader": {
+            "suggested_key": {
+                "default": "Alt+T"
+            },
+            "description": "Auto Start Reader"
+        }
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "host_permissions": [
+        "wss://ws.voicerankings.com/",
+        "https://cdn.soundranks.com/*",
+        "https://voicerankings.com/*",
+        "https://*.voicerankings.com/*",
+        "https://*.tts.speech.microsoft.com/",
+        "https://texttospeech.googleapis.com/",
+        "https://generativelanguage.googleapis.com/",
+        "https://api.sws.speechify.com/",
+        "https://api.murf.ai/",
+        "https://api.inworld.ai/",
+        "https://api.async.com/",
+        "https://api.deepinfra.com/",
+        "https://api.openai.com/",
+        "https://api.deepgram.com/",
+        "https://f.cluster.resemble.ai/",
+        "https://api.replicate.com/",
+        "https://*.replicate.delivery/",
+        "https://users.rime.ai/",
+        "https://api.xiaomimimo.com/",
+        "https://api.stepfun.ai/",
+        "https://api.x.ai/",
+        "https://api.mistral.ai/",
+        "https://openrouter.ai/*",
+        "https://dashscope-intl.aliyuncs.com/*"
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "images/logo.png",
+                "off_screen.html",
+                "off_screen.js"
+            ],
+            "matches": [
+                "<all_urls>"
+            ],
+            "use_dynamic_url": true
+        }
+    ],
+    "content_scripts": [
+        {
+            "run_at": "document_start",
+            "matches": [
+                "<all_urls>"
+            ],
+            "all_frames": false,
+            "js": [
+                "content_script.js"
+            ]
+        }
+    ]
+}
