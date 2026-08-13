@@ -23,8 +23,9 @@ Designed to integrate seamlessly with [VoiceRankings.com](https://voicerankings.
 ## 📚 Documentation (`/docs/`)
 
 Explore our detailed documentation guides:
-
+- 🔊 [**Supported Models & Providers**](docs/SUPPORTED_MODELS.md) — Every supported TTS model: single-provider API keys vs. one-key-many-models aggregators (OpenRouter, DeepInfra).
 - 🧹 [**Domain Filters Guide**](docs/DOMAIN_FILTERS.md) — Comprehensive guide on word-level vs sentence-level filtering, CSS selector element removal, Regex patterns, and domain scope matching.
+
 - 🧘 [**Relaxed Mode Customization**](docs/RELAXED_MODE_CUSTOMIZATION.md) — How to add site-specific cleanup selectors for the non-strict / relaxed page extractor.
 - 🏷️ [**Trademark & Brand Policy**](TRADEMARK.md) — Brand usage rules, trademark notices, and GPLv3 Section 7(c) requirements for forks.
 - 🏗️ [**Architecture & Messaging**](ARCHITECTURE.md) — Technical overview of Chrome Manifest V3 service workers, offscreen audio, and content script ports.
@@ -121,7 +122,7 @@ async function handle({ text, serviceOptions, userApiKey }) {
 
 ## 🔒 Privacy & Credentials Security
 
-- All **BYOK API keys** are encrypted and stored locally in `chrome.storage.local`.
+- All **BYOK API keys** are stored locally in `chrome.storage.local`.
 - Credentials are **never** sent to VoiceRankings servers.
 - Anonymous telemetry can be toggled on/off under **Settings > General**.
 
