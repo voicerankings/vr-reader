@@ -11,7 +11,7 @@
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-4fc08d.svg)](https://vuejs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646cff.svg)](https://vitejs.dev/)
 
-Welcome to **VoiceRankings Reader** — an open-source Chrome extension providing seamless, high-quality text-to-speech (TTS), web page reading, content filtering, and bring your own keys(BYOK) right in your browser.
+**A Reader You Own.** — Open source. Bring your own keys. Choose your providers. No subscriptions. No lock-in.
 
 
 Designed to integrate seamlessly with [VoiceRankings.com](https://voicerankings.com) voice catelogs while keeping client logic fully open-source and customizable.
