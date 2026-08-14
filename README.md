@@ -1,4 +1,10 @@
-# VoiceRankings Reader (`vr-reader`) 🚀
+<p align="center">
+<img src="./images/logo.png" width="96" alt="Description">
+</p>
+
+<div align="center">
+  <h1>VoiceRankings Reader (<code>vr-reader</code>) </h1>
+</div>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)](manifest.json)
@@ -7,7 +13,17 @@
 
 Welcome to **VoiceRankings Reader** — an open-source Chrome extension providing seamless, high-quality text-to-speech (TTS), web page reading, content filtering, and bring your own keys(BYOK) right in your browser.
 
+
 Designed to integrate seamlessly with [VoiceRankings.com](https://voicerankings.com) voice catelogs while keeping client logic fully open-source and customizable.
+
+<img width="1280" height="800" alt="1280x800-sidepanel-voice-options-preview" src="https://github.com/user-attachments/assets/63e84eb5-178a-4f71-a1c4-2eeb184e8412" />
+
+<p align="center">
+<em>VR-Reader supports over 30+ models with over 3000+ voices <a href="docs/SUPPORTED_MODELS.md" rel="nofollow">view full list</a></em>
+</p>
+
+https://github.com/user-attachments/assets/a25affa5-26a8-423d-abd2-bd41184b517b
+
 
 ---
 
