@@ -86,6 +86,21 @@ VR_Reader.makeBottomOverlay = makeBottomOverlay;
 
 function makeRatingsOverlay({voice, generation_credits, replayQueue, index, 
     callback, sessionId, showCreditWarning = false, hasOwnKey = false}) {
+
+    // Global settings: let users disable the "Rate [voice]'s reading" overlay and the
+    // "Continue reading the rest of the page" overlay across all sites. When both are
+    // disabled, do not render any overlay at all.
+    const showRatingUI = VR_Reader.savedLocalStorageGlobal?.['DEFAULT_SHOW_VOICE_RATING_PROMPT'] !== false;
+    const showContinueUI = VR_Reader.savedLocalStorageGlobal?.['DEFAULT_SHOW_CONTINUE_READING_PROMPT'] !== false;
+
+    if (!showRatingUI && !showContinueUI) {
+        const existingElement = document.getElementById("shadowdom-vk-ratings-overlay");
+        if (existingElement) {
+            existingElement.remove();
+        }
+        VR_Reader.ratingsOverlayClass = null;
+        return;
+    }
  
     // Step 1: ALWAYS clean up any previous overlay first.
     // The DOM is the single source of truth.
@@ -110,7 +125,9 @@ function makeRatingsOverlay({voice, generation_credits, replayQueue, index,
         callback, 
         sessionId, 
         showCreditWarning, 
-        hasOwnKey
+        hasOwnKey,
+        showRatingUI,
+        showContinueUI
     });	
     VR_Reader.ratingsOverlayClass.initShadowDOM(shadowDomDiv)
     VR_Reader.ratingsOverlayClass.render();

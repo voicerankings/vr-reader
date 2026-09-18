@@ -18,7 +18,8 @@ export function checkReadLaterStatus() {
 
 export function triggerReadLaterOverlay(bookmark = null) {
     setTimeout(() => {
-        if (window.VR_Reader && window.VR_Reader.makeRatingsOverlay) {
+        const showContinueUI = (window.VR_Reader && window.VR_Reader.savedLocalStorageGlobal?.['DEFAULT_SHOW_CONTINUE_READING_PROMPT'] !== false);
+        if (window.VR_Reader && window.VR_Reader.makeRatingsOverlay && showContinueUI) {
             window.VR_Reader.sessionCharsRead = 0; // Reset session count when popup appears
             window.VR_Reader.makeRatingsOverlay({
                 voice: { character_name: 'Continue' },
@@ -52,53 +53,61 @@ export function triggerReadLaterOverlay(bookmark = null) {
                 window.VR_Reader.ratingsOverlayClass._handleContinueReading = async () => {
                     console.log('📖 Continue reading from Read Later');
                     window.VR_Reader.ratingsOverlayClass.close(true);
-                    window.VR_Reader.hasContinuedReading = true;
-
-                    try {
-                        let parsedText = "";
-
-                        if (bookmark && bookmark.text_fragment_url) {
-                            // Extract from bookmark data (reliable)
-                            parsedText = bookmark.text_fragment_url.split('#:~:text=')[1]
-                                ? decodeURIComponent(bookmark.text_fragment_url.split('#:~:text=')[1])
-                                : "";
-                        } else {
-                            // Extract from current hash (fallback)
-                            const hashText = window.location.hash.split('#:~:text=')[1];
-                            if (hashText) {
-                                parsedText = decodeURIComponent(hashText);
-                            }
-                        }
-
-                        const mockData = {
-                            fragmentInfo: {
-                                fullText: parsedText,
-                                textStart: parsedText
-                            },
-                            selectionText: parsedText,
-                            capturedAt: Date.now(),
-                            pageUrl: window.location.href,
-                            pageTitle: document.title
-                        };
-
-                        window.VR_Reader.storedSelectionData = mockData;
-                        window.VR_Reader.isTrackingReadLater = true;
-
-                        // Show loading state on button
-                        const continueBtn = window.VR_Reader.ratingsOverlayClass.shadow.querySelector('.continue-button');
-                        if (continueBtn) continueBtn.innerText = "Loading...";
-
-                        const result = await window.VR_Reader.calculateRemainingText();
-                        window.VR_Reader.remainingTextResult = result;
-
-                        let textToRead = (result && result.articleText) ? result.articleText : parsedText;
-                        window.VR_Reader.resumeSentenceText = (bookmark && bookmark.last_read_text) ? bookmark.last_read_text : null;
-                        await window.VR_Reader.readHighlightedText(textToRead, mockData);
-                    } catch (e) {
-                        console.error('Error starting Read Later', e);
-                    }
+                    await resumeReadLater(bookmark);
                 };
             }
+            return;
+        }
+
+        // Global setting turned the "Continue reading" prompt off (or there is no
+        // overlay runner): resume reading directly without showing any overlay.
+        if (window.VR_Reader && window.VR_Reader.readHighlightedText) {
+            resumeReadLater(bookmark);
         }
     }, 1500); // Allow DOM to settle and native highlight to apply
+}
+
+async function resumeReadLater(bookmark = null) {
+    console.log('📖 Continue reading from Read Later');
+    window.VR_Reader.hasContinuedReading = true;
+
+    try {
+        let parsedText = "";
+
+        if (bookmark && bookmark.text_fragment_url) {
+            // Extract from bookmark data (reliable)
+            parsedText = bookmark.text_fragment_url.split('#:~:text=')[1]
+                ? decodeURIComponent(bookmark.text_fragment_url.split('#:~:text=')[1])
+                : "";
+        } else {
+            // Extract from current hash (fallback)
+            const hashText = window.location.hash.split('#:~:text=')[1];
+            if (hashText) {
+                parsedText = decodeURIComponent(hashText);
+            }
+        }
+
+        const mockData = {
+            fragmentInfo: {
+                fullText: parsedText,
+                textStart: parsedText
+            },
+            selectionText: parsedText,
+            capturedAt: Date.now(),
+            pageUrl: window.location.href,
+            pageTitle: document.title
+        };
+
+        window.VR_Reader.storedSelectionData = mockData;
+        window.VR_Reader.isTrackingReadLater = true;
+
+        const result = await window.VR_Reader.calculateRemainingText();
+        window.VR_Reader.remainingTextResult = result;
+
+        let textToRead = (result && result.articleText) ? result.articleText : parsedText;
+        window.VR_Reader.resumeSentenceText = (bookmark && bookmark.last_read_text) ? bookmark.last_read_text : null;
+        await window.VR_Reader.readHighlightedText(textToRead, mockData);
+    } catch (e) {
+        console.error('Error starting Read Later', e);
+    }
 }

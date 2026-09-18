@@ -31,11 +31,15 @@ export default class RatingsOverlay {
         showCreditWarning = false,
         voice_reviews_count = 0,
         hasOwnKey = false, 
-        forceTokenDisplay = false
+        forceTokenDisplay = false,
+        showRatingUI = true,
+        showContinueUI = true
         }) {
 
         this.canRateVoice = true; 
         this.showCreditWarning = showCreditWarning;
+        this.showRatingUI = showRatingUI;
+        this.showContinueUI = showContinueUI;
         this.percentageRead = 0;
         this.voice_reviews_count = voice_reviews_count;
         this.hasOwnKey = hasOwnKey; // Store key status
@@ -226,6 +230,24 @@ export default class RatingsOverlay {
                 /* Animation End: Slide up, but keep 15px TUCKED BEHIND */
                 /* This overlap eliminates the white gap */
                 transform: translateY(calc(-100% + 15px));
+            }
+
+            /* Rating UI hidden: render the continue bar as a standalone card */
+            .overlay-content.continue-only {
+                background: transparent;
+                padding: 0;
+                box-shadow: none;
+            }
+
+            .continue-reading-bar.standalone {
+                position: static;
+                transform: none;
+                z-index: auto;
+                border-radius: 12px;
+            }
+
+            .continue-reading-bar.standalone.visible {
+                transform: none;
             }
 
             .continue-content {
@@ -496,6 +518,10 @@ export default class RatingsOverlay {
     }
 
     async _calculateRemainingText() {
+        if (!this.showContinueUI) {
+            this.showContinueReading = false;
+            return;
+        }
         if (this.skipCalculateRemaining) return;
         if (window.VR_Reader && window.VR_Reader.hasContinuedReading) {
             this.showContinueReading = false;
@@ -573,7 +599,7 @@ export default class RatingsOverlay {
 
     _showContinueReadingBar() {
         const continueBar = this.shadow.querySelector('.continue-reading-bar');
-        if (continueBar && this.showContinueReading) {
+        if (continueBar && this.showContinueReading && this.showContinueUI) {
             setTimeout(() => {
                 continueBar.classList.add('visible');
             }, 1000); 
@@ -1071,18 +1097,18 @@ export default class RatingsOverlay {
 
         // --- DETERMINE MAIN THEME CLASSES ---
         // If hasOwnKey is true, we use the purple theme
-        const contentClasses = `overlay-content ${isOwnKey ? 'own-key-theme' : ''} ${!hasWarning ? 'rounded-top' : ''}`;
+        const contentClasses = `overlay-content ${isOwnKey ? 'own-key-theme' : ''} ${!hasWarning ? 'rounded-top' : ''} ${!this.showRatingUI && this.showContinueUI ? 'continue-only' : ''}`;
 
-        container.innerHTML = `
-            ${warningHTML}
-            <div class="${contentClasses}">
-                
-                <!-- Progress Bar Container -->
-                <!-- Note: This will be hidden via updateProgressBar() for Paid Users -->
-                <div class="progress-bar-container">
-                    <div class="progress-bar"></div>
-                </div>
+        // Global setting: both reader prompts disabled -> never render the overlay.
+        if (!this.showRatingUI && !this.showContinueUI) {
+            this.destroy();
+            return;
+        }
 
+        // --- RATING SECTION (hideable via the global "voice rating prompt" setting) ---
+        let mainContentHTML;
+        if (this.showRatingUI) {
+            mainContentHTML = `
                 <div class="main-content">
 
                     <!-- Stars and Title -->
@@ -1131,25 +1157,62 @@ export default class RatingsOverlay {
                         </svg>
                     </button>
                 </div>
+            `;
+        } else {
+            mainContentHTML = `
+                <div class="main-content" style="justify-content: flex-end; padding: 8px 12px;">
+                    <!-- Close -->
+                    <button class="close-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
 
-                <!-- Continue Reading (Bottom Slide-up) -->
-                 <div class="continue-reading-bar">
-                    <div class="continue-content">
-                        <div class="continue-text">
-                            <span class="continue-icon">📖</span>
-                            <span>Continue reading the rest of the page</span>
-                        </div>
-                        <div class="continue-stats">
-                            <span class="remaining-percentage">${this.remainingTextPercentage}% remaining</span>
-                            <button 
-                            data-tooltip="Calculating preview..."
-                            class="continue-button">Continue</button>
-                        </div>
+        // --- CONTINUE READING BAR (hideable via the global "continue reading" setting) ---
+        const continueBarHTML = this.showContinueUI ? `
+            <div class="continue-reading-bar ${this.showRatingUI ? '' : 'standalone'}">
+                <div class="continue-content">
+                    <div class="continue-text">
+                        <span class="continue-icon">📖</span>
+                        <span>Continue reading the rest of the page</span>
+                    </div>
+                    <div class="continue-stats">
+                        <span class="remaining-percentage">${this.remainingTextPercentage}% remaining</span>
+                        <button 
+                        data-tooltip="Calculating preview..."
+                        class="continue-button">Continue</button>
                     </div>
                 </div>
+            </div>
+        ` : '';
+
+        container.innerHTML = `
+            ${warningHTML}
+            <div class="${contentClasses}">
+                
+                <!-- Progress Bar Container -->
+                <!-- Note: This will be hidden via updateProgressBar() for Paid Users -->
+                ${this.showRatingUI ? `
+                    <div class="progress-bar-container">
+                        <div class="progress-bar"></div>
+                    </div>
+                ` : ''}
+
+                ${mainContentHTML}
+
+                ${continueBarHTML}
 
             </div>
         `;
+
+        // Re-entrancy: remove any previously rendered container so the overlay
+        // can rebuild itself in place when the global settings change live.
+        const renderedContainer = this.shadow?.querySelector('.overlay-container');
+        if (renderedContainer) renderedContainer.remove();
 
         this.shadow.appendChild(container);
 
@@ -1244,5 +1307,33 @@ export default class RatingsOverlay {
         setTimeout(() => {
             container.classList.add('visible');
         }, 10);
+
+        // On an in-place rebuild (e.g. settings changed while the overlay is showing),
+        // the continue bar may already be flagged as visible but needs its animation
+        // re-armed against the freshly rendered markup.
+        if (this.showContinueReading) {
+            this._showContinueReadingBar();
+        }
+    }
+
+    /**
+     * Re-syncs visibility from the global "reader overlay" settings while the overlay
+     * is open, so toggling the side panel settings applies immediately without a
+     * page reload. If every reader prompt is disabled the overlay closes entirely.
+     */
+    applyGlobalOverlaySettings() {
+        if (!VR_Reader || !VR_Reader.savedLocalStorageGlobal) return;
+
+        this.showRatingUI = VR_Reader.savedLocalStorageGlobal['DEFAULT_SHOW_VOICE_RATING_PROMPT'] !== false;
+        this.showContinueUI = VR_Reader.savedLocalStorageGlobal['DEFAULT_SHOW_CONTINUE_READING_PROMPT'] !== false;
+
+        if (!this.showRatingUI && !this.showContinueUI) {
+            this.destroy();
+            return;
+        }
+
+        if (this.shadow) {
+            this.render();
+        }
     }
 }
