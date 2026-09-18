@@ -168,6 +168,14 @@ export function openContentScriptPort() {
                 }
             }
 
+            if (m.key === 'DEFAULT_SHOW_VOICE_RATING_PROMPT' || m.key === 'DEFAULT_SHOW_CONTINUE_READING_PROMPT') {
+                // Live-apply the reader overlay settings to any overlay currently
+                // showing on this page, so toggles take effect without a reload.
+                if (VR_Reader.ratingsOverlayClass) {
+                    VR_Reader.ratingsOverlayClass.applyGlobalOverlaySettings();
+                }
+            }
+
             if (m.key === 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE') {
                 const placement = (m.value === 'middle' || m.value === 'bottom') ? m.value : 'bottom';
                 if (VR_Reader.vrrQuickAccessButton && VR_Reader.vrrQuickAccessButton.shadow) {

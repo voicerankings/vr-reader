@@ -299,6 +299,8 @@ Object.assign(window.VR_Reader || {}, {
         storage['DEFAULT_MAX_AUTO_READ_LIMIT_ENABLED'] = isNotEqualToNullorUndefined(storage['DEFAULT_MAX_AUTO_READ_LIMIT_ENABLED']) ? storage['DEFAULT_MAX_AUTO_READ_LIMIT_ENABLED'] : false;
         storage['DEFAULT_MAX_AUTO_READ_LIMIT'] = isNotEqualToNullorUndefined(storage['DEFAULT_MAX_AUTO_READ_LIMIT']) ? storage['DEFAULT_MAX_AUTO_READ_LIMIT'] : 4000;
         storage['DEFAULT_EXTERNAL_TIMESTAMP_SERVICE'] = isNotEqualToNullorUndefined(storage['DEFAULT_EXTERNAL_TIMESTAMP_SERVICE']) ? storage['DEFAULT_EXTERNAL_TIMESTAMP_SERVICE'] : 'None';
+        storage['DEFAULT_SHOW_VOICE_RATING_PROMPT'] = isNotEqualToNullorUndefined(storage['DEFAULT_SHOW_VOICE_RATING_PROMPT']) ? storage['DEFAULT_SHOW_VOICE_RATING_PROMPT'] : true;
+        storage['DEFAULT_SHOW_CONTINUE_READING_PROMPT'] = isNotEqualToNullorUndefined(storage['DEFAULT_SHOW_CONTINUE_READING_PROMPT']) ? storage['DEFAULT_SHOW_CONTINUE_READING_PROMPT'] : true;
 
 
         Object.assign(VR_Reader.savedLocalStorageGlobal, storage);

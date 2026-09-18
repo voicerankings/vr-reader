@@ -10,7 +10,7 @@ import { CONSTANTS } from "../../../js/constants/constants";
 const { API_NUXT_DOMAIN, userProfile, allowTelemetry, getFromStorageAllowTelemetry, localSettingsTab } = useMyComposable();
 
 import useLocalSettings from '../../composables/useLocalSettings';
-const { maxAutoReadLimitEnabled, maxAutoReadLimit } = useLocalSettings();
+const { maxAutoReadLimitEnabled, maxAutoReadLimit, showVoiceRatingPromptState, showContinueReadingPromptState, getFromStorageOverlayPromptSettings } = useLocalSettings();
 
 const domainFilterEnabled = ref(true);
 const readerStrictMode = ref(true);
@@ -29,6 +29,24 @@ watch(readerStrictMode, (newVal) => {
   chrome.runtime.sendMessage({
     action: "update-contentscript-storage",
     key: 'DEFAULT_READER_STRICT_MODE',
+    value: newVal
+  });
+});
+
+watch(showVoiceRatingPromptState, (newVal) => {
+  saveToLocalStorage({ 'DEFAULT_SHOW_VOICE_RATING_PROMPT': newVal });
+  chrome.runtime.sendMessage({
+    action: "update-contentscript-storage",
+    key: 'DEFAULT_SHOW_VOICE_RATING_PROMPT',
+    value: newVal
+  });
+});
+
+watch(showContinueReadingPromptState, (newVal) => {
+  saveToLocalStorage({ 'DEFAULT_SHOW_CONTINUE_READING_PROMPT': newVal });
+  chrome.runtime.sendMessage({
+    action: "update-contentscript-storage",
+    key: 'DEFAULT_SHOW_CONTINUE_READING_PROMPT',
     value: newVal
   });
 });
@@ -82,6 +100,7 @@ const supportSubject = ref('');
 
 onMounted(async () => {
   await getFromStorageAllowTelemetry();
+  await getFromStorageOverlayPromptSettings();
   const result = await chrome.storage.local.get('DEFAULT_READER_STRICT_MODE');
   if (result.DEFAULT_READER_STRICT_MODE !== undefined) {
     readerStrictMode.value = result.DEFAULT_READER_STRICT_MODE;
@@ -420,6 +439,40 @@ const submitSupport = async () => {
         <input type="checkbox" v-model="readerStrictMode" class="sr-only peer">
         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
       </label>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-2">
+    <div class="pr-4 text-left">
+      <h3 class="text-sm font-medium text-gray-900">Reader Overlays</h3>
+    </div>
+  </div>
+  <div class="pt-2 border-t border-gray-100">
+    <div class="flex items-center justify-between">
+      <div class="pr-4 text-left">
+        <h3 class="text-sm font-medium text-gray-900">Show voice rating prompt after reading</h3>
+        <p class="text-xs text-gray-500 mt-1">Hide the "Rate [voice]'s reading" overlay that appears after playback ends or pauses.</p>
+      </div>
+      <div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" v-model="showVoiceRatingPromptState" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+      <div class="pr-4 text-left">
+        <h3 class="text-sm font-medium text-gray-900">Show "Continue reading the rest of the page" prompt</h3>
+        <p class="text-xs text-gray-500 mt-1">Hide the overlay that offers to resume reading from where you stopped on the page.</p>
+      </div>
+      <div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" v-model="showContinueReadingPromptState" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
     </div>
   </div>
 </div>

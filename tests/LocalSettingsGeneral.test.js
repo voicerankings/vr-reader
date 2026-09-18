@@ -17,7 +17,10 @@ vi.mock('../src/composables/Composable', () => ({
 vi.mock('../src/composables/useLocalSettings', () => ({
     default: () => ({
         maxAutoReadLimitEnabled: ref(true),
-        maxAutoReadLimit: ref(5000)
+        maxAutoReadLimit: ref(5000),
+        showVoiceRatingPromptState: ref(true),
+        showContinueReadingPromptState: ref(true),
+        getFromStorageOverlayPromptSettings: vi.fn(() => Promise.resolve())
     })
 }));
 
@@ -41,8 +44,8 @@ describe('LocalSettingsGeneral.vue', () => {
         vi.clearAllMocks();
     });
 
-    it('renders general settings options correctly', () => {
-        const wrapper = mount(LocalSettingsGeneral, {
+    function mountComponent() {
+        return mount(LocalSettingsGeneral, {
             global: {
                 directives: { tooltip: () => {} },
                 stubs: {
@@ -54,8 +57,47 @@ describe('LocalSettingsGeneral.vue', () => {
                 }
             }
         });
+    }
+
+    it('renders general settings options correctly', () => {
+        const wrapper = mountComponent();
 
         const text = wrapper.text();
         expect(text).toContain('Custom domain filters');
+    });
+
+    it('renders the reader overlay toggles', () => {
+        const wrapper = mountComponent();
+
+        const text = wrapper.text();
+        expect(text).toContain('Show voice rating prompt after reading');
+        expect(text).toContain('Show "Continue reading the rest of the page" prompt');
+    });
+
+    it('persists the reader overlay toggles and broadcasts to the content script', async () => {
+        const wrapper = mountComponent();
+
+        const { saveToLocalStorage } = await import('../js/utils/helpers');
+        const { sendMessage } = global.chrome.runtime;
+
+        const checkboxes = wrapper.findAll('input[type="checkbox"]');
+        // The final two checkboxes are the Reader Overlays toggles.
+        const [ratingCheckbox, continueCheckbox] = checkboxes.slice(-2);
+
+        await ratingCheckbox.setValue(false);
+        expect(saveToLocalStorage).toHaveBeenCalledWith({ 'DEFAULT_SHOW_VOICE_RATING_PROMPT': false });
+        expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'update-contentscript-storage',
+            key: 'DEFAULT_SHOW_VOICE_RATING_PROMPT',
+            value: false
+        }));
+
+        await continueCheckbox.setValue(false);
+        expect(saveToLocalStorage).toHaveBeenCalledWith({ 'DEFAULT_SHOW_CONTINUE_READING_PROMPT': false });
+        expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'update-contentscript-storage',
+            key: 'DEFAULT_SHOW_CONTINUE_READING_PROMPT',
+            value: false
+        }));
     });
 });

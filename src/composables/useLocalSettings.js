@@ -24,6 +24,9 @@ const openRouterSttModelState = ref("openai/whisper-large-v3");
 
 const summReaderPageState = ref("AUTO_READ");
 
+const showVoiceRatingPromptState = ref(true);
+const showContinueReadingPromptState = ref(true);
+
 
 const pageChatAudioState = ref(true);
 const pageChatModelState = ref("Claude");
@@ -97,6 +100,15 @@ async function getFromStorageExternalTimestampSettings(){
     openRouterSttModelState.value = isNotEqualToNullorUndefined(result.DEFAULT_OPENROUTER_STT_MODEL) ? result.DEFAULT_OPENROUTER_STT_MODEL : "openai/whisper-large-v3";
 }
 
+async function getFromStorageOverlayPromptSettings(){
+    let result = await readLocalStorage([
+        'DEFAULT_SHOW_VOICE_RATING_PROMPT',
+        'DEFAULT_SHOW_CONTINUE_READING_PROMPT'
+    ]);
+    showVoiceRatingPromptState.value = isNotEqualToNullorUndefined(result.DEFAULT_SHOW_VOICE_RATING_PROMPT) ? result.DEFAULT_SHOW_VOICE_RATING_PROMPT : showVoiceRatingPromptState.value;
+    showContinueReadingPromptState.value = isNotEqualToNullorUndefined(result.DEFAULT_SHOW_CONTINUE_READING_PROMPT) ? result.DEFAULT_SHOW_CONTINUE_READING_PROMPT : showContinueReadingPromptState.value;
+}
+
 export default function useLocalSettings() {
     return {
         quickAccessState, 
@@ -126,5 +138,8 @@ export default function useLocalSettings() {
         openRouterSttApiKeyState,
         openRouterSttModelState,
         getFromStorageExternalTimestampSettings,
+        getFromStorageOverlayPromptSettings,
+        showVoiceRatingPromptState,
+        showContinueReadingPromptState,
     }
 }
