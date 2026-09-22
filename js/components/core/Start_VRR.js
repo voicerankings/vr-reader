@@ -26,7 +26,9 @@ import {
     getInnerText_pageReader,
     setDomainSettings,
     getHostName,
-    getFormattedSelection
+    getFormattedSelection,
+    parsePlacementState,
+    getQuadrantPlacementCSS
 } from "../../utils/helpers";
 import {
     getOpenGraphImageWithFallbacks
@@ -810,9 +812,12 @@ export default class Start_VRR {
 
     createHTML() {
         const savedPlacement = VR_Reader.savedLocalStorageGlobal && VR_Reader.savedLocalStorageGlobal['DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE'];
-        const panelPlacement = (savedPlacement === 'middle' || savedPlacement === 'bottom') ? savedPlacement : 'bottom';
+        const parsed = parsePlacementState(savedPlacement);
+        const quadrant = getQuadrantPlacementCSS(parsed.x, parsed.y);
+        const inlineStyle = Object.entries(quadrant.style).map(([k, v]) => `${k}:${v}`).join(';');
+        const legacyClass = parsed.isLegacy ? `placement-${parsed.legacyType}` : '';
         return `  
-            <div id="quick-access" class="container placement-${panelPlacement}">
+            <div id="quick-access" class="container expand-${quadrant.expandDirection} ${legacyClass}" style="${inlineStyle}">
                 <div class="wrapper">
                     <div id="simple-reader-btn" class="main-btn top-tooltip">
                         ${this.svgSimplerReader2(28)}
@@ -860,9 +865,51 @@ style() {
         return `
             ${defaultCSS()}
             <style>
-                .container { position: fixed; right: 10px; bottom: 122px; z-index: 10000000000; }
-                .container.placement-bottom { bottom: 122px; }
-                .container.placement-middle { bottom: 50%; transform: translateY(60px); }
+                .container { position: fixed; z-index: 10000000000; }
+                .container.placement-bottom { bottom: 122px; right: 10px; }
+                .container.placement-middle { bottom: 50%; right: 10px; transform: translateY(60px); }
+
+                /* EXPAND DOWN RULES */
+                .container.expand-down .controls-menu {
+                    bottom: auto;
+                    top: calc(100% + 10px);
+                    transform: translateY(-10px);
+                }
+                .container.expand-down .wrapper:hover .controls-menu {
+                    transform: translateY(0);
+                }
+                .container.expand-down .selection-hint {
+                    bottom: auto;
+                    top: calc(100% + 12px);
+                    transform: translateY(-10px);
+                }
+                .container.expand-down .wrapper.hint-mode .selection-hint {
+                    transform: translateY(0);
+                }
+
+                /* ALIGN LEFT RULES */
+                .container.align-left .controls-menu {
+                    right: auto;
+                    left: 0;
+                }
+                .container.align-left .selection-hint {
+                    right: auto;
+                    left: 0;
+                }
+                .container.expand-down .top-tooltip[data-tooltip]:before {
+                    bottom: auto;
+                    top: 100%;
+                    transform: translate(-50%, 8px);
+                }
+                .container.expand-down .top-tooltip[data-tooltip]:after {
+                    top: 100%;
+                    bottom: auto;
+                    transform: translate(-50%, 3px);
+                    border-top: none;
+                    border-bottom: 5px solid hsla(0, 0%, 5%, 0.85);
+                }
+
+
                 .wrapper { position: relative; display: flex; justify-content: flex-end; align-items: center; }
                 
                 /* MAIN BUTTON STYLES */

@@ -9,10 +9,16 @@
 import * as Icons from '../shared/icons.js';
 import * as Styles from './widgetStyles.js';
 import { defaultCSS } from '../../config/defaultCSS.js';
+import { parsePlacementState, getQuadrantPlacementCSS } from '../../utils/helpers.js';
 
 export function createHTML({ readMode, SWITCH_SECTIONS, panelPlacement = "bottom" }) {
+    const parsed = parsePlacementState(panelPlacement);
+    const quadrant = getQuadrantPlacementCSS(parsed.x, parsed.y);
+    const inlineStyle = Object.entries(quadrant.style).map(([k, v]) => `${k}:${v}`).join(';');
+    const legacyClass = parsed.isLegacy ? `placement-${parsed.legacyType}` : '';
+
     return ` 
-        <div id="VR-Reader" class="hidden placement-${panelPlacement} ${readMode ? readMode : ''}">
+        <div id="VR-Reader" class="hidden expand-${quadrant.expandDirection} align-${quadrant.alignSide} ${legacyClass} ${readMode ? readMode : ''}" style="${inlineStyle}">
             <div class="content">
                 <div id="SectionSwitchTabContainer" class=""  style="display:flex;">                    
                     <div id="MainSection" class="mouseover-view main-content">

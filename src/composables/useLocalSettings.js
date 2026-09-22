@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue';
-import {readLocalStorage, fnBrowserDetect,isNotEqualToNullorUndefined} from '../../js/utils/helpers'
+import { readLocalStorage, fnBrowserDetect, isNotEqualToNullorUndefined, parsePlacementState } from '../../js/utils/helpers'
 
 const quickAccessState = ref(true);
 const quickAccessPanelPlacementState = ref("bottom");
@@ -73,6 +73,14 @@ async function getFromStorageQuickAccessControls(){
     quickAccessPanelPlacementState.value = isNotEqualToNullorUndefined(result.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE) ? result.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE : quickAccessPanelPlacementState.value;
     enterKeyPlayState.value = isNotEqualToNullorUndefined(result.DEFAULT_ENTER_KEY_PLAY_STATE) ? result.DEFAULT_ENTER_KEY_PLAY_STATE : enterKeyPlayState.value;
 }  
+
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE) {
+            quickAccessPanelPlacementState.value = changes.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE.newValue;
+        }
+    });
+}
 
 async function getFromStorageContextMenuControls(){
     let result = await readLocalStorage(['CONTEXT_MENU_SHOW_RECENT_VOICES']); 

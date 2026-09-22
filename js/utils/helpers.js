@@ -1016,3 +1016,77 @@ export function removeLoader() {
         loader.remove();
     }
 }
+
+/**
+ * Helper to normalize placement state into a position object { x: number, y: number }
+ * Supports legacy strings ("bottom", "middle", "top") and JSON objects/strings.
+ */
+export function parsePlacementState(val) {
+    if (!val) return { x: 95, y: 85, isLegacy: true, legacyType: 'bottom' };
+
+    if (typeof val === 'object' && val !== null && typeof val.x === 'number' && typeof val.y === 'number') {
+        return {
+            x: Math.min(Math.max(val.x, 0), 98),
+            y: Math.min(Math.max(val.y, 0), 98)
+        };
+    }
+
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed === 'bottom') return { x: 95, y: 85, isLegacy: true, legacyType: 'bottom' };
+        if (trimmed === 'middle') return { x: 95, y: 50, isLegacy: true, legacyType: 'middle' };
+        if (trimmed === 'top') return { x: 95, y: 15, isLegacy: true, legacyType: 'top' };
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (typeof parsed === 'object' && parsed !== null && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+                return {
+                    x: Math.min(Math.max(parsed.x, 0), 98),
+                    y: Math.min(Math.max(parsed.y, 0), 98)
+                };
+            }
+        } catch (e) {
+            // fallback
+        }
+    }
+
+    return { x: 95, y: 85, isLegacy: true, legacyType: 'bottom' };
+}
+
+/**
+ * Returns dynamic CSS style object based on quadrant positioning.
+ * X >= 50% -> right: (100 - X)%; X < 50% -> left: X%
+ * Y >= 50% -> bottom: (100 - Y)%; Y < 50% -> top: Y%
+ */
+export function getQuadrantPlacementCSS(x, y) {
+    const isRightHalf = x >= 50;
+    const isBottomHalf = y >= 50;
+
+    const style = {};
+    if (isRightHalf) {
+        style.right = `${(100 - x).toFixed(1)}%`;
+        style.left = 'auto';
+    } else {
+        style.left = `${x.toFixed(1)}%`;
+        style.right = 'auto';
+    }
+
+    if (isBottomHalf) {
+        style.bottom = `${(100 - y).toFixed(1)}%`;
+        style.top = 'auto';
+    } else {
+        style.top = `${y.toFixed(1)}%`;
+        style.bottom = 'auto';
+    }
+
+    const expandDirection = isBottomHalf ? 'up' : 'down';
+    const alignSide = isRightHalf ? 'right' : 'left';
+
+    return {
+        style,
+        isRightHalf,
+        isBottomHalf,
+        expandDirection,
+        alignSide
+    };
+}

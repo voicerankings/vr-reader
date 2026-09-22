@@ -10,7 +10,8 @@ import {
     deleteSettingPropertyInAllDomains,
     setDomainSettings,
     getHostName,
-    saveToLocalStorage
+    saveToLocalStorage,
+    getQuadrantPlacementCSS
 } from "../../utils/helpers";
 import { CONSTANTS } from "../../../js/constants/constants"
 import { toggleTab } from './TabController.js';
@@ -338,4 +339,158 @@ export async function initListeners(widget) {
             widget.playbackClass.setPlayerFocus()
         }
     })
+
+    // Pointer dragging for #VR-Reader widget
+    const vrReaderEl = root.querySelector("#VR-Reader");
+    if (vrReaderEl) {
+        let isDragging    = false;
+        let startX        = 0;
+        let startY        = 0;
+        let initialLeft   = 0;
+        let initialTop    = 0;
+        let hasMoved      = false;
+        let expandedW     = 0;
+        let expandedH     = 0;
+        let collapsedW    = 0;
+        let collapsedH    = 0;
+        let wasExpandUp   = false;
+        let wasAlignRight = false;
+
+        const handlePointerDown = (e) => {
+            // Only drag on the main widget body — ignore clicks on interactive controls
+            const interactiveTags = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'];
+            if (interactiveTags.includes(e.target.tagName)) return;
+
+            isDragging = true;
+            hasMoved   = false;
+            startX     = e.clientX;
+            startY     = e.clientY;
+
+            const rect    = vrReaderEl.getBoundingClientRect();
+            initialLeft   = rect.left;
+            initialTop    = rect.top;
+
+            // Capture initial expanded dimensions and expand state BEFORE is-dragging collapses the widget
+            expandedW     = vrReaderEl.offsetWidth;
+            expandedH     = vrReaderEl.offsetHeight;
+            wasExpandUp   = vrReaderEl.classList.contains('expand-up');
+            wasAlignRight = vrReaderEl.classList.contains('align-right');
+        };
+
+        const handlePointerMove = (e) => {
+            if (!isDragging) return;
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+
+            if (Math.hypot(deltaX, deltaY) > 5) {
+                if (!hasMoved) {
+                    hasMoved = true;
+                    // Add is-dragging class to collapse hover panels via CSS
+                    vrReaderEl.classList.add('is-dragging');
+
+                    // Read collapsed dimensions immediately after CSS applies (transition:none)
+                    collapsedW = vrReaderEl.offsetWidth;
+                    collapsedH = vrReaderEl.offsetHeight;
+
+                    // If drag started from an expanded state in bottom half (expand-up),
+                    // the Play Button was at the BOTTOM of the expanded box (rect.top + expandedH - collapsedH).
+                    // Shift initialTop down so the collapsed Play Button stays directly under the cursor.
+                    if (wasExpandUp) {
+                        initialTop += (expandedH - collapsedH);
+                    }
+
+                    // If drag started from an expanded state in right half (align-right),
+                    // the Play Button was at the RIGHT of the expanded box (rect.left + expandedW - collapsedW).
+                    // Shift initialLeft right so the collapsed Play Button stays directly under the cursor.
+                    if (wasAlignRight) {
+                        initialLeft += (expandedW - collapsedW);
+                    }
+                }
+
+                const VW = window.innerWidth;
+                const VH = window.innerHeight;
+
+                const newLeft = initialLeft + deltaX;
+                const newTop  = initialTop  + deltaY;
+
+                // Clamp: keep at least 20% of the collapsed widget on-screen
+                const clampedLeft = Math.min(Math.max(newLeft, -collapsedW * 0.8), VW - collapsedW * 0.2);
+                const clampedTop  = Math.min(Math.max(newTop,  0), VH - 20);
+
+                // Drive position with raw pixels during the drag for perfect 1:1 tracking
+                vrReaderEl.style.left   = `${clampedLeft}px`;
+                vrReaderEl.style.right  = 'auto';
+                vrReaderEl.style.top    = `${clampedTop}px`;
+                vrReaderEl.style.bottom = 'auto';
+
+                // Update expand-direction and align-side classes based on collapsed pill center
+                const pillCenterX  = clampedLeft + collapsedW / 2;
+                const pillCenterY  = clampedTop  + collapsedH / 2;
+                const isRightHalf  = pillCenterX >= VW / 2;
+                const isBottomHalf = pillCenterY >= VH / 2;
+
+                vrReaderEl.classList.remove('expand-up', 'expand-down', 'align-left', 'align-right', 'placement-bottom', 'placement-middle');
+                vrReaderEl.classList.add(isBottomHalf ? 'expand-up' : 'expand-down');
+                vrReaderEl.classList.add(isRightHalf ? 'align-right' : 'align-left');
+            }
+        };
+
+        const handlePointerUp = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            vrReaderEl.classList.remove('is-dragging');
+
+            if (hasMoved) {
+                const VW = window.innerWidth;
+                const VH = window.innerHeight;
+
+                const leftPx = parseFloat(vrReaderEl.style.left) || 0;
+                const topPx  = parseFloat(vrReaderEl.style.top)  || 0;
+
+                const pillCenterX  = leftPx + collapsedW / 2;
+                const pillCenterY  = topPx  + collapsedH / 2;
+                const isRightHalf  = pillCenterX >= VW / 2;
+                const isBottomHalf = pillCenterY >= VH / 2;
+
+                let saveX, saveY;
+
+                if (isRightHalf) {
+                    // Right half anchor: right edge of the collapsed pill
+                    saveX = ((leftPx + collapsedW) / VW) * 100;
+                } else {
+                    // Left half anchor: left edge of the collapsed pill
+                    saveX = (leftPx / VW) * 100;
+                }
+
+                if (isBottomHalf) {
+                    // Bottom half anchor: bottom edge of the collapsed pill
+                    saveY = ((topPx + collapsedH) / VH) * 100;
+                } else {
+                    // Top half anchor: top edge of the collapsed pill
+                    saveY = (topPx / VH) * 100;
+                }
+
+                saveX = Math.min(Math.max(Math.round(saveX), 0), 98);
+                saveY = Math.min(Math.max(Math.round(saveY), 0), 98);
+
+                const quadrant = getQuadrantPlacementCSS(saveX, saveY);
+                vrReaderEl.style.left   = quadrant.style.left;
+                vrReaderEl.style.right  = quadrant.style.right;
+                vrReaderEl.style.top    = quadrant.style.top;
+                vrReaderEl.style.bottom = quadrant.style.bottom;
+
+                const placementValue = JSON.stringify({ x: saveX, y: saveY });
+                saveToLocalStorage({ 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE': placementValue }, true);
+                chrome.runtime.sendMessage({
+                    action: "update-contentscript-storage",
+                    key: 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE',
+                    value: placementValue
+                });
+            }
+        };
+
+        vrReaderEl.addEventListener('pointerdown', handlePointerDown);
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+    }
 }
