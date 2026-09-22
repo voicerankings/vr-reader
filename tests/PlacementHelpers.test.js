@@ -17,9 +17,9 @@ describe('Placement Helpers Unit Tests', () => {
         expect(res).toEqual({ x: 10, y: 20 });
     });
 
-    it('clamps values within safety bounds 0-98%', () => {
+    it('clamps values within safety bounds 0-100%', () => {
         const res = parsePlacementState(JSON.stringify({ x: -10, y: 150 }));
-        expect(res).toEqual({ x: 0, y: 98 });
+        expect(res).toEqual({ x: 0, y: 100 });
     });
 
     it('computes quadrant CSS for bottom right position (95%, 85%)', () => {

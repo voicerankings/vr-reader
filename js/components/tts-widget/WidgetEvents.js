@@ -472,8 +472,8 @@ export async function initListeners(widget) {
                     saveY = (topPx / VH) * 100;
                 }
 
-                saveX = Math.min(Math.max(Math.round(saveX), 0), 98);
-                saveY = Math.min(Math.max(Math.round(saveY), 0), 98);
+                saveX = Math.min(Math.max(Math.round(saveX), 0), 100);
+                saveY = Math.min(Math.max(Math.round(saveY), 0), 100);
 
                 const quadrant = getQuadrantPlacementCSS(saveX, saveY);
                 vrReaderEl.style.left   = quadrant.style.left;

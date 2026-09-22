@@ -1026,8 +1026,8 @@ export function parsePlacementState(val) {
 
     if (typeof val === 'object' && val !== null && typeof val.x === 'number' && typeof val.y === 'number') {
         return {
-            x: Math.min(Math.max(val.x, 0), 98),
-            y: Math.min(Math.max(val.y, 0), 98)
+            x: Math.min(Math.max(val.x, 0), 100),
+            y: Math.min(Math.max(val.y, 0), 100)
         };
     }
 
@@ -1041,8 +1041,8 @@ export function parsePlacementState(val) {
             const parsed = JSON.parse(trimmed);
             if (typeof parsed === 'object' && parsed !== null && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
                 return {
-                    x: Math.min(Math.max(parsed.x, 0), 98),
-                    y: Math.min(Math.max(parsed.y, 0), 98)
+                    x: Math.min(Math.max(parsed.x, 0), 100),
+                    y: Math.min(Math.max(parsed.y, 0), 100)
                 };
             }
         } catch (e) {

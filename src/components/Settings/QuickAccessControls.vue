@@ -33,8 +33,8 @@ function syncPosFromState(val) {
 }
 
 function savePosition(x, y) {
-    posX.value = Math.min(Math.max(Math.round(x), 0), 98);
-    posY.value = Math.min(Math.max(Math.round(y), 0), 98);
+    posX.value = Math.min(Math.max(Math.round(x), 0), 100);
+    posY.value = Math.min(Math.max(Math.round(y), 0), 100);
     const placementValue = JSON.stringify({ x: posX.value, y: posY.value });
     quickAccessPanelPlacementState.value = placementValue;
 }
@@ -244,7 +244,7 @@ const svgPageText = ref(`<svg style="display:inline-block;vertical-align:middle;
                 <input
                     type="range"
                     min="0"
-                    max="98"
+                    max="100"
                     :value="posX"
                     @input="savePosition($event.target.value, posY)"
                     class="w-full accent-indigo-600 cursor-pointer h-1.5 bg-gray-200 rounded-lg"
@@ -256,7 +256,7 @@ const svgPageText = ref(`<svg style="display:inline-block;vertical-align:middle;
                 <input
                     type="range"
                     min="0"
-                    max="98"
+                    max="100"
                     :value="posY"
                     @input="savePosition(posX, $event.target.value)"
                     class="w-full accent-indigo-600 cursor-pointer h-1.5 bg-gray-200 rounded-lg"
