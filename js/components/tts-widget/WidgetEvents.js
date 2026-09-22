@@ -341,8 +341,10 @@ export async function initListeners(widget) {
     })
 
     // Pointer dragging for #VR-Reader widget
+    // Drag is only triggered from the mini player controls area (#PreviewContainer)
     const vrReaderEl = root.querySelector("#VR-Reader");
-    if (vrReaderEl) {
+    const dragHandle = root.querySelector("#PreviewContainer");
+    if (vrReaderEl && dragHandle) {
         let isDragging    = false;
         let startX        = 0;
         let startY        = 0;
@@ -357,7 +359,7 @@ export async function initListeners(widget) {
         let wasAlignRight = false;
 
         const handlePointerDown = (e) => {
-            // Only drag on the main widget body — ignore clicks on interactive controls
+            // Only drag on the mini player controls — ignore clicks on interactive controls
             const interactiveTags = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'];
             if (interactiveTags.includes(e.target.tagName)) return;
 
@@ -489,7 +491,7 @@ export async function initListeners(widget) {
             }
         };
 
-        vrReaderEl.addEventListener('pointerdown', handlePointerDown);
+        dragHandle.addEventListener('pointerdown', handlePointerDown);
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp);
     }

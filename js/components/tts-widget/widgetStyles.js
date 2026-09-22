@@ -635,16 +635,18 @@ export function style() {
         position: fixed;
         z-index:10000000000000000;
         max-height: 96vh;   
+    }
+    #PreviewContainer {
         cursor: grab;
         touch-action: none;
     }
     #VR-Reader.is-dragging, #VR-Reader.is-dragging * {
         cursor: grabbing !important;
     }
-    /* During drag: fully collapse the widget to its closed/hidden state.
-       Mirrors exactly what .hidden does — collapses OptionButtons, hides the
-       expanded panels and VoicePlayer — so there's no layout jitter from the
-       dynamic expand-up / expand-down menu repositioning mid-drag. */
+    /* During drag: collapse the hover menu and expanded content panels.
+       The hover menu (OptionButtons) must collapse because it can dynamically
+       switch between slide-up and slide-down orientation, which would shift
+       the widget's position mid-drag. */
     #VR-Reader.is-dragging #OptionButtons {
         height: 0px !important;
         min-height: 0px !important;
@@ -653,7 +655,6 @@ export function style() {
         transition: none !important;
     }
     #VR-Reader.is-dragging .mouseover-view,
-    #VR-Reader.is-dragging #VoicePlayerContainer,
     #VR-Reader.is-dragging .message-content {
         display: none !important;
         overflow: hidden !important;
