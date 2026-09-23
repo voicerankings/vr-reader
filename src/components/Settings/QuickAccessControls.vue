@@ -46,13 +46,16 @@ function applyPreset(presetX, presetY) {
 function handleCanvasClickOrDrag(event) {
     if (!canvasRef.value) return;
     const rect = canvasRef.value.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+    const clickX = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+    const clickY = Math.max(0, Math.min(event.clientY - rect.top, rect.height));
 
     const xPct = (clickX / rect.width) * 100;
     const yPct = (clickY / rect.height) * 100;
 
-    savePosition(xPct, yPct);
+    // During drag, only update local refs — don't write to quickAccessPanelPlacementState
+    // to avoid the watcher/syncPosFromState feedback loop.
+    posX.value = Math.min(Math.max(Math.round(xPct), 0), 100);
+    posY.value = Math.min(Math.max(Math.round(yPct), 0), 100);
 }
 
 function onCanvasMouseDown(event) {
@@ -72,6 +75,9 @@ function onCanvasMouseUp() {
     isCanvasDragging.value = false;
     window.removeEventListener('mousemove', onCanvasMouseMove);
     window.removeEventListener('mouseup', onCanvasMouseUp);
+    // Commit final position to storage
+    const placementValue = JSON.stringify({ x: posX.value, y: posY.value });
+    quickAccessPanelPlacementState.value = placementValue;
 }
 
 async function loadHiddenSites() {
@@ -130,7 +136,9 @@ onMounted(async () => {
     });
 
     quickAccessPanelPlacementWatch = watch(quickAccessPanelPlacementState, (newState)=>{ 
-        syncPosFromState(newState);
+        if (!isCanvasDragging.value) {
+            syncPosFromState(newState);
+        }
         chrome.runtime.sendMessage({ action: "update-contentscript-storage",
             key:'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE',
             value:newState
@@ -191,8 +199,8 @@ const svgPageText = ref(`<svg style="display:inline-block;vertical-align:middle;
     <!-- Play button widget placement control -->
     <div class="w-full p-3 border-b border-gray-200 text-left">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-gray-700 font-semibold text-sm">Play button widget placement</span>
-            <span class="text-xs font-mono text-indigo-600 font-medium">X: {{ posX }}% | Y: {{ posY }}%</span>
+            <span class="text-gray-700 font-semibold text-sm">Widget Placement</span>
+            <span class="text-xs font-mono text-indigo-600 font-medium whitespace-nowrap">X: {{ posX }}%  |  Y: {{ posY }}%</span>
         </div>
 
         <!-- Interactive Screen Canvas Preview -->

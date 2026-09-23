@@ -950,7 +950,7 @@ export default class Start_VRR {
         const inlineStyle = Object.entries(quadrant.style).map(([k, v]) => `${k}:${v}`).join(';');
         const legacyClass = parsed.isLegacy ? `placement-${parsed.legacyType}` : '';
         return `  
-            <div id="quick-access" class="container expand-${quadrant.expandDirection} ${legacyClass}" style="${inlineStyle}">
+            <div id="quick-access" class="container expand-${quadrant.expandDirection} align-${quadrant.alignSide} ${legacyClass}" style="${inlineStyle}">
                 <div class="wrapper">
                     <div id="simple-reader-btn" class="main-btn top-tooltip">
                         <div class="play-action">
@@ -1030,6 +1030,7 @@ style() {
                 .container.align-left .selection-hint {
                     right: auto;
                     left: 0;
+                    flex-direction: row-reverse;
                 }
                 .container.expand-down .top-tooltip[data-tooltip]:before {
                     bottom: auto;
@@ -1049,8 +1050,8 @@ style() {
                 
                 /* MAIN BUTTON STYLES */
                 .main-btn { 
-                    width: 42px; 
-                    height: 42px; 
+                    width: 34px; 
+                    height: 34px; 
                     background-color: #f0f0f054; 
                     border: 1px solid #cccccc61; 
                     border-radius: 50%; 
@@ -1081,8 +1082,8 @@ style() {
 
                 /* PLAY ACTION INNER CIRCLE */
                 .play-action {
-                    width: 26px;
-                    height: 26px;
+                    width: 20px;
+                    height: 20px;
                     background-color: #1a1a2e;
                     border-radius: 50%;
                     display: flex;
@@ -1296,12 +1297,27 @@ style() {
                     border-radius: 50%;
                     background-color: rgba(167, 139, 250, 0.18);
                     color: #a78bfa;
-                    animation: vrr-hint-bounce 1.4s ease-in-out infinite;
+                    animation: vrr-hint-bounce-down 1.4s ease-in-out infinite;
                 }
 
-                @keyframes vrr-hint-bounce {
+                /* When the hint appears below the button (expand-down), rotate the
+                   arrow 180deg so it points UP toward the play button. The box
+                   itself stays in the same place — only the arrow direction flips. */
+                .container.expand-down .selection-hint-arrow svg {
+                    transform: rotate(180deg);
+                }
+                .container.expand-down .selection-hint .selection-hint-arrow {
+                    animation-name: vrr-hint-bounce-up;
+                }
+
+                @keyframes vrr-hint-bounce-down {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(4px); }
+                }
+
+                @keyframes vrr-hint-bounce-up {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-4px); }
                 }
 
                 .wrapper.hint-mode .controls-menu {
@@ -1329,6 +1345,11 @@ style() {
                     transform: translateY(14px);
                     transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
                     transition-delay: 0s;
+                }
+                /* When hint is below button, fade upward instead */
+                .container.expand-down .wrapper.hint-mode.hint-leaving .selection-hint {
+                    transform: translateY(-14px);
+                }
                 }
 
                 .wrapper.hint-mode.hint-leaving .main-btn {

@@ -495,4 +495,52 @@ export async function initListeners(widget) {
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp);
     }
+
+    // --- AUTO-HIDE: Fade player to opacity:0 after 5s of no mouse movement ---
+    {
+        const vrReaderEl = root.querySelector("#VR-Reader");
+        if (!vrReaderEl) return;
+
+        let autoHideTimer = null;
+        const AUTO_HIDE_DELAY = 5000;
+
+        const resetAutoHideTimer = () => {
+            if (!VR_Reader.savedLocalStorageGlobal['DEFAULT_AUTO_HIDE_WIDGET_STATE']) return;
+            clearTimeout(autoHideTimer);
+            vrReaderEl.style.transition = 'opacity 0.4s ease';
+            vrReaderEl.style.opacity = '1';
+            autoHideTimer = setTimeout(() => {
+                vrReaderEl.style.opacity = '0';
+            }, AUTO_HIDE_DELAY);
+        };
+
+        const cancelAutoHide = () => {
+            clearTimeout(autoHideTimer);
+            vrReaderEl.style.transition = 'opacity 0.4s ease';
+            vrReaderEl.style.opacity = '1';
+        };
+
+        const onSettingChange = () => {
+            if (VR_Reader.savedLocalStorageGlobal['DEFAULT_AUTO_HIDE_WIDGET_STATE']) {
+                resetAutoHideTimer();
+            } else {
+                cancelAutoHide();
+            }
+        };
+
+        window.addEventListener('mousemove', resetAutoHideTimer);
+        root.addEventListener('mouseover', resetAutoHideTimer);
+
+        // Also react to live setting changes from the sidepanel
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+            chrome.storage.onChanged.addListener((changes, area) => {
+                if (area === 'local' && changes.DEFAULT_AUTO_HIDE_WIDGET_STATE) {
+                    onSettingChange();
+                }
+            });
+        }
+
+        // Start timer if setting is already enabled
+        onSettingChange();
+    }
 }

@@ -4,6 +4,7 @@ import { readLocalStorage, fnBrowserDetect, isNotEqualToNullorUndefined, parsePl
 const quickAccessState = ref(true);
 const quickAccessPanelPlacementState = ref("bottom");
 const enterKeyPlayState = ref(true);
+const autoHideWidgetState = ref(false);
 
 const contextMenuShowRecentVoicesState = ref(false)
 
@@ -66,12 +67,14 @@ async function getFromStorageQuickAccessControls(){
     let result = await readLocalStorage([
         'DEFAULT_QUICK_ACCESS_CONTROLS_STATE',
         'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE',
-        'DEFAULT_ENTER_KEY_PLAY_STATE'
+        'DEFAULT_ENTER_KEY_PLAY_STATE',
+        'DEFAULT_AUTO_HIDE_WIDGET_STATE'
     ]); 
 
     quickAccessState.value = isNotEqualToNullorUndefined(result.DEFAULT_QUICK_ACCESS_CONTROLS_STATE)? result.DEFAULT_QUICK_ACCESS_CONTROLS_STATE : quickAccessState.value;
     quickAccessPanelPlacementState.value = isNotEqualToNullorUndefined(result.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE) ? result.DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE : quickAccessPanelPlacementState.value;
     enterKeyPlayState.value = isNotEqualToNullorUndefined(result.DEFAULT_ENTER_KEY_PLAY_STATE) ? result.DEFAULT_ENTER_KEY_PLAY_STATE : enterKeyPlayState.value;
+    autoHideWidgetState.value = isNotEqualToNullorUndefined(result.DEFAULT_AUTO_HIDE_WIDGET_STATE) ? result.DEFAULT_AUTO_HIDE_WIDGET_STATE : autoHideWidgetState.value;
 }  
 
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
@@ -122,6 +125,7 @@ export default function useLocalSettings() {
         quickAccessState, 
         quickAccessPanelPlacementState,
         enterKeyPlayState,
+        autoHideWidgetState,
         getFromStorageQuickAccessControls,
         getFromStorageContextMenuControls,
         contextMenuShowRecentVoicesState,
