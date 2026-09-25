@@ -80,9 +80,17 @@ describe('LocalSettingsGeneral.vue', () => {
         const { saveToLocalStorage } = await import('../js/utils/helpers');
         const { sendMessage } = global.chrome.runtime;
 
-        const checkboxes = wrapper.findAll('input[type="checkbox"]');
-        // The final two checkboxes are the Reader Overlays toggles.
-        const [ratingCheckbox, continueCheckbox] = checkboxes.slice(-2);
+        // Locate the overlay toggles by their row label text instead of DOM order,
+        // so the test stays robust if other settings are added/reordered above.
+        const findToggleByLabel = (labelText) => wrapper
+            .findAll('input[type="checkbox"]')
+            .find((cb) => cb.element.closest('.flex')
+                ?.querySelector('h3')?.textContent?.trim() === labelText);
+
+        const ratingCheckbox = findToggleByLabel('Show voice rating prompt after reading');
+        const continueCheckbox = findToggleByLabel('Show "Continue reading the rest of the page" prompt');
+        expect(ratingCheckbox).toBeTruthy();
+        expect(continueCheckbox).toBeTruthy();
 
         await ratingCheckbox.setValue(false);
         expect(saveToLocalStorage).toHaveBeenCalledWith({ 'DEFAULT_SHOW_VOICE_RATING_PROMPT': false });
