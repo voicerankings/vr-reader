@@ -1198,8 +1198,8 @@ export default class ExternalVoicePlayer {
         if (this.wordHighlighter) this.wordHighlighter.clearWordHighlights();
     }
 
-    resetToDefaults() {
-        if (this.sessionManager) this.sessionManager.resetToDefaults();
+    async resetToDefaults() {
+        if (this.sessionManager) await this.sessionManager.resetToDefaults();
     }
 
     initializePlaySession() {
@@ -1301,9 +1301,10 @@ export default class ExternalVoicePlayer {
         }
     }
 
-    voiceChanged() {
-        console.log("⚠️ Voice changed during playback. Stopping current session.");
-        this.sessionManager.resetToDefaults();
+    async voiceChanged() {
+        console.log("⚠️ Voice changed during playback. Flushing telemetry, then resetting.");
+        if (this.sessionManager) await this.sessionManager.flushTelemetry();
+        if (this.sessionManager) await this.sessionManager.resetToDefaults();
         this.voiceChangedCallback?.();
     }
 }

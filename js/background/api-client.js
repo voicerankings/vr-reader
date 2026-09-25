@@ -81,30 +81,48 @@ const VRR_Requests = {
   recordPlayEvent: async function ({
     play_duration_seconds,
     session_id,
-    sessionStartTime,
+    play_started_at,
     voice_id,
     url_full,
     character_count,
     has_own_key
   }) {
-    const response = await fetch(`https://${API_NUXT_DOMAIN}/api/v1/voice/play-event`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        voice_id,
-        session_id,
-        play_duration_seconds: play_duration_seconds,
-        platform: 'chrome_extension',
-        play_started_at: sessionStartTime,
-        play_finished_at: new Date().toISOString(),
-        character_count,
-        has_own_key
-      })
-    });
+    if (!voice_id) {
+      const msg = 'recordPlayEvent called without voice_id — skipping.';
+      console.error('❌ [recordPlayEvent]', msg);
+      throw new Error(msg);
+    }
 
-    const data = await response.json();
-    console.log('Play recorded:', data);
+    try {
+      const response = await fetch(`https://${API_NUXT_DOMAIN}/api/v1/voice/play-event`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voice_id,
+          session_id,
+          play_duration_seconds: play_duration_seconds,
+          platform: 'chrome_extension',
+          play_started_at: play_started_at || new Date().toISOString(),
+          play_finished_at: new Date().toISOString(),
+          character_count,
+          has_own_key
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '(no body)');
+        console.error(`❌ [recordPlayEvent] HTTP ${response.status}: ${errorText.substring(0, 300)}`);
+        throw new Error(`recordPlayEvent failed: HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [recordPlayEvent] Play recorded:', data);
+      return data;
+    } catch (err) {
+      console.error('❌ [recordPlayEvent] Request failed:', err);
+      throw err;
+    }
   },
 
   saveVoiceDefaultOnServer: async function (voiceDefaultPayload) {

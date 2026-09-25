@@ -41,8 +41,13 @@ export default class SessionManager {
         }
     }
 
-    resetToDefaults() {
+    async resetToDefaults() {
         console.log("🔄 Resetting ExternalVoicePlayer to defaults...");
+
+        if (this.player.telemetryBatch.sentenceCount > 0) {
+            console.log("📊 Flushing telemetry before reset...");
+            await this.flushTelemetry();
+        }
 
         this.player.sessionId = null;
         this.player.sessionStartTime = null;
@@ -104,11 +109,12 @@ export default class SessionManager {
         console.log("Playback state has been reset.");
     }
 
-    flushTelemetry() {
+    async flushTelemetry() {
         if (this.player.telemetryBatch.sentenceCount === 0) return;
 
         const charCount = this.player.telemetryBatch.character_count;
         const duration = this.player.telemetryBatch.play_duration_seconds;
+        const sentenceCount = this.player.telemetryBatch.sentenceCount;
 
         this.player.telemetryBatch.character_count = 0;
         this.player.telemetryBatch.play_duration_seconds = 0;
@@ -116,19 +122,49 @@ export default class SessionManager {
 
         const currentClip = (this.player.replayQueue && this.player.currentPlayingIndex >= 0) ? this.player.replayQueue[this.player.currentPlayingIndex] : null;
 
-        chrome.runtime.sendMessage({
-            action: "recordPlayEvent",
-            payload: {
-                voice_id: this.player.currentVoiceId || currentClip?.voice?.voice_id || this.player.voice?.voice_id,
-                session_id: this.player.sessionId,
-                play_duration_seconds: duration,
-                platform: 'chrome_extension',
-                url_full: window.location.href,
-                play_started_at: this.player.sessionStartTime,
-                play_finished_at: new Date().toISOString(),
-                character_count: charCount,
-                has_own_key: this.player.currentClipHasOwnKey
+        const voiceId = this.player.currentVoiceId
+            || currentClip?.voice?.voice_id
+            || this.player.voice?.voice_id
+            || this.player.voicePrefs?.activeVoiceId
+            || null;
+
+        if (!voiceId) {
+            console.warn("⚠️ [Telemetry] No voice_id available — flushing without it. This should not happen if a voice was played.");
+        }
+
+        const payload = {
+            voice_id: voiceId,
+            session_id: this.player.sessionId,
+            play_duration_seconds: duration,
+            platform: 'chrome_extension',
+            url_full: window.location.href,
+            play_started_at: this.player.sessionStartTime,
+            play_finished_at: new Date().toISOString(),
+            character_count: charCount,
+            has_own_key: this.player.currentClipHasOwnKey
+        };
+
+        console.log(`📊 [Telemetry] Flushing: voice=${payload.voice_id}, chars=${charCount}, duration=${duration.toFixed(1)}s, session=${payload.session_id}`);
+
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: "recordPlayEvent",
+                payload
+            });
+
+            if (response && response.success) {
+                console.log("✅ [Telemetry] Flush confirmed by background.");
+            } else {
+                console.warn("⚠️ [Telemetry] Background rejected flush, restoring batch:", response);
+                this.player.telemetryBatch.character_count += charCount;
+                this.player.telemetryBatch.play_duration_seconds += duration;
+                this.player.telemetryBatch.sentenceCount += sentenceCount;
             }
-        }).catch(err => console.error("Telemetry flush failed:", err));
+        } catch (err) {
+            console.error("❌ [Telemetry] Flush message delivery failed, restoring batch for retry:", err);
+            this.player.telemetryBatch.character_count += charCount;
+            this.player.telemetryBatch.play_duration_seconds += duration;
+            this.player.telemetryBatch.sentenceCount += sentenceCount;
+        }
     }
 }

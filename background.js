@@ -515,6 +515,16 @@ const MESSAGE_HANDLERS = {
 };
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'recordPlayEvent') {
+    MESSAGE_HANDLERS['recordPlayEvent'](request, sender)
+      .then(() => sendResponse({ success: true }))
+      .catch(err => {
+        console.error('❌ [background] recordPlayEvent handler failed:', err);
+        sendResponse({ success: false, error: err?.message || String(err) });
+      });
+    return true;
+  }
+
   sendResponse(true);
   if (request.action && MESSAGE_HANDLERS[request.action]) {
     MESSAGE_HANDLERS[request.action](request, sender);

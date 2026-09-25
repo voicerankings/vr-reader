@@ -334,7 +334,7 @@ export default class TTSVoicePlayer extends ExternalVoicePlayer {
     async makePlayUtteranceList(autoRead = true) {
         // 1. Reset
         this.replayQueueVoiceStorage = {};
-        this.resetToDefaults();
+        await this.resetToDefaults();
 
         const currentVoiceId = this.voicePrefs.activeVoiceId;
         this.initializeVoiceQueue(currentVoiceId);
