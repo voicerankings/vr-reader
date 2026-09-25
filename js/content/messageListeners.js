@@ -8,8 +8,27 @@
  */
 window.VR_Reader = window.VR_Reader || {};
 const VR_Reader = window.VR_Reader;
-import { getFormattedSelection } from '../utils/helpers.js';
+import { getFormattedSelection, parsePlacementState, getQuadrantPlacementCSS } from '../utils/helpers.js';
 import * as CONSTANTS from '../constants/constants.js';
+
+export function applyPlacementToElement(element, placementValue) {
+    if (!element) return;
+    const parsed = parsePlacementState(placementValue);
+    const quadrant = getQuadrantPlacementCSS(parsed.x, parsed.y);
+
+    element.style.left = quadrant.style.left;
+    element.style.right = quadrant.style.right;
+    element.style.top = quadrant.style.top;
+    element.style.bottom = quadrant.style.bottom;
+
+    element.classList.remove('expand-up', 'expand-down', 'align-left', 'align-right', 'placement-bottom', 'placement-middle', 'placement-top');
+    element.classList.add('expand-' + quadrant.expandDirection);
+    element.classList.add('align-' + quadrant.alignSide);
+    if (parsed.isLegacy) {
+        element.classList.add('placement-' + parsed.legacyType);
+    }
+}
+
 
 chrome.runtime.onMessage.addListener(async function (message, sender, sendResponse) {
 
@@ -177,20 +196,13 @@ export function openContentScriptPort() {
             }
 
             if (m.key === 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE') {
-                const placement = (m.value === 'middle' || m.value === 'bottom') ? m.value : 'bottom';
                 if (VR_Reader.vrrQuickAccessButton && VR_Reader.vrrQuickAccessButton.shadow) {
                     const containerEl = VR_Reader.vrrQuickAccessButton.shadow.querySelector('.container');
-                    if (containerEl) {
-                        containerEl.classList.remove('placement-middle', 'placement-bottom');
-                        containerEl.classList.add('placement-' + placement);
-                    }
+                    applyPlacementToElement(containerEl, m.value);
                 }
                 if (VR_Reader.ttsWidget && VR_Reader.ttsWidget.superUltraRoot) {
                     const vrReaderEl = VR_Reader.ttsWidget.superUltraRoot.querySelector('#VR-Reader');
-                    if (vrReaderEl) {
-                        vrReaderEl.classList.remove('placement-middle', 'placement-bottom');
-                        vrReaderEl.classList.add('placement-' + placement);
-                    }
+                    applyPlacementToElement(vrReaderEl, m.value);
                 }
             }
         } else if (m.action === "update-contentscript-user-logged-in") {

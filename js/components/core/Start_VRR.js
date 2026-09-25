@@ -26,7 +26,9 @@ import {
     getInnerText_pageReader,
     setDomainSettings,
     getHostName,
-    getFormattedSelection
+    getFormattedSelection,
+    parsePlacementState,
+    getQuadrantPlacementCSS
 } from "../../utils/helpers";
 import {
     getOpenGraphImageWithFallbacks
@@ -103,6 +105,7 @@ export default class Start_VRR {
         return new Promise((resolve) => {
             const wrapper = this.shadow && this.shadow.querySelector('.wrapper');
             const mainBtn = this.shadow && this.shadow.querySelector('#simple-reader-btn');
+            const playAction = this.shadow && this.shadow.querySelector('.play-action');
             const closeNow = () => {
                 this.close(true);
                 resolve();
@@ -110,7 +113,7 @@ export default class Start_VRR {
 
             // Let the quick press-release animation finish before fading out,
             // so the click feels like one fast tactile push.
-            const isSpringing = mainBtn && mainBtn.classList.contains('springing');
+            const isSpringing = playAction && playAction.classList.contains('springing');
             const springDelay = isSpringing ? 160 : 0;
 
             const fadeBtn = () => {
@@ -145,11 +148,16 @@ export default class Start_VRR {
     init() {
         if (!this.shadow) return;
 
+        const mainBtn = this.shadow.querySelector("#simple-reader-btn");
+        const playAction = this.shadow.querySelector(".play-action");
+        const wrapper = this.shadow.querySelector(".wrapper");
+
+        // --- PLAY ACTION HANDLERS (inner dark circle) ---
         // Capture any user-highlighted text on mousedown (before the browser
         // collapses the selection when the button gains focus) and keep the
         // native highlight visible by preventing the default mousedown action.
-        const mainBtn = this.shadow.querySelector("#simple-reader-btn");
-        mainBtn.addEventListener("mousedown", (e) => {
+        playAction.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
             const selText = getFormattedSelection();
             if (selText && selText.trim().length > 0) {
                 this._pendingSelection = selText;
@@ -158,28 +166,29 @@ export default class Start_VRR {
                 this._pendingSelection = "";
             }
             // Squash the button for instant tactile feedback.
-            mainBtn.classList.add('pressing');
-            mainBtn.classList.remove('springing');
+            playAction.classList.add('pressing');
+            playAction.classList.remove('springing');
         });
 
         // If the pointer leaves the button before release, undo the squash
         // without triggering the spring bounce.
-        mainBtn.addEventListener("mouseleave", () => {
-            mainBtn.classList.remove('pressing');
+        playAction.addEventListener("mouseleave", () => {
+            playAction.classList.remove('pressing');
         });
-        mainBtn.addEventListener("pointercancel", () => {
-            mainBtn.classList.remove('pressing');
+        playAction.addEventListener("pointercancel", () => {
+            playAction.classList.remove('pressing');
         });
-        mainBtn.addEventListener("animationend", (e) => {
+        playAction.addEventListener("animationend", (e) => {
             if (e.animationName === 'vrr-spring') {
-                mainBtn.classList.remove('springing');
+                playAction.classList.remove('springing');
             }
         });
 
-        mainBtn.addEventListener("click", async() => {
+        playAction.addEventListener("click", async(e) => {
+            e.stopPropagation();
             // Spring back with a satisfying bounce when released.
-            mainBtn.classList.remove('pressing');
-            mainBtn.classList.add('springing');
+            playAction.classList.remove('pressing');
+            playAction.classList.add('springing');
 
             const defaultVoiceData = {}
 
@@ -217,6 +226,132 @@ export default class Start_VRR {
             }
 
         });
+
+        // --- DRAG HANDLERS (outer circle) ---
+        {
+            let isDragging    = false;
+            let startX        = 0;
+            let startY        = 0;
+            let initialLeft   = 0;
+            let initialTop    = 0;
+            let hasMoved      = false;
+            let collapsedW    = 0;
+            let collapsedH    = 0;
+
+            const quickAccessEl = this.shadow.querySelector("#quick-access");
+
+            const handlePointerDown = (e) => {
+                isDragging = true;
+                hasMoved   = false;
+                startX     = e.clientX;
+                startY     = e.clientY;
+
+                const rect    = quickAccessEl.getBoundingClientRect();
+                initialLeft   = rect.left;
+                initialTop    = rect.top;
+                collapsedW    = quickAccessEl.offsetWidth;
+                collapsedH    = quickAccessEl.offsetHeight;
+            };
+
+            const handlePointerMove = (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                if (Math.hypot(deltaX, deltaY) > 5) {
+                    if (!hasMoved) {
+                        hasMoved = true;
+                        quickAccessEl.classList.add('is-dragging');
+                        if (wrapper) wrapper.classList.add('is-dragging');
+                    }
+
+                    const VW = window.innerWidth;
+                    const VH = window.innerHeight;
+
+                    const newLeft = initialLeft + deltaX;
+                    const newTop  = initialTop  + deltaY;
+
+                    // Clamp: keep at least 20% of the element on-screen
+                    const clampedLeft = Math.min(Math.max(newLeft, -collapsedW * 0.8), VW - collapsedW * 0.2);
+                    const clampedTop  = Math.min(Math.max(newTop, 0), VH - 20);
+
+                    // Drive position with raw pixels during the drag for perfect 1:1 tracking
+                    quickAccessEl.style.left   = `${clampedLeft}px`;
+                    quickAccessEl.style.right  = 'auto';
+                    quickAccessEl.style.top    = `${clampedTop}px`;
+                    quickAccessEl.style.bottom = 'auto';
+
+                    // Update expand-direction and align-side classes based on element center
+                    const centerX = clampedLeft + collapsedW / 2;
+                    const centerY = clampedTop  + collapsedH / 2;
+                    const isRightHalf  = centerX >= VW / 2;
+                    const isBottomHalf = centerY >= VH / 2;
+
+                    quickAccessEl.classList.remove('expand-up', 'expand-down', 'align-left', 'align-right');
+                    quickAccessEl.classList.add(isBottomHalf ? 'expand-up' : 'expand-down');
+                    quickAccessEl.classList.add(isRightHalf ? 'align-right' : 'align-left');
+                }
+            };
+
+            const handlePointerUp = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                quickAccessEl.classList.remove('is-dragging');
+                if (wrapper) wrapper.classList.remove('is-dragging');
+
+                if (hasMoved) {
+                    const VW = window.innerWidth;
+                    const VH = window.innerHeight;
+
+                    const leftPx = parseFloat(quickAccessEl.style.left) || 0;
+                    const topPx  = parseFloat(quickAccessEl.style.top)  || 0;
+
+                    const centerX = leftPx + collapsedW / 2;
+                    const centerY = topPx  + collapsedH / 2;
+                    const isRightHalf  = centerX >= VW / 2;
+                    const isBottomHalf = centerY >= VH / 2;
+
+                    let saveX, saveY;
+
+                    if (isRightHalf) {
+                        saveX = ((leftPx + collapsedW) / VW) * 100;
+                    } else {
+                        saveX = (leftPx / VW) * 100;
+                    }
+
+                    if (isBottomHalf) {
+                        saveY = ((topPx + collapsedH) / VH) * 100;
+                    } else {
+                        saveY = (topPx / VH) * 100;
+                    }
+
+                    saveX = Math.min(Math.max(Math.round(saveX), 0), 100);
+                    saveY = Math.min(Math.max(Math.round(saveY), 0), 100);
+
+                    const quadrant = getQuadrantPlacementCSS(saveX, saveY);
+                    quickAccessEl.style.left   = quadrant.style.left;
+                    quickAccessEl.style.right  = quadrant.style.right;
+                    quickAccessEl.style.top    = quadrant.style.top;
+                    quickAccessEl.style.bottom = quadrant.style.bottom;
+
+                    quickAccessEl.classList.remove('expand-up', 'expand-down', 'align-left', 'align-right');
+                    quickAccessEl.classList.add(`expand-${quadrant.expandDirection}`);
+                    quickAccessEl.classList.add(`align-${quadrant.alignSide}`);
+
+                    const placementValue = JSON.stringify({ x: saveX, y: saveY });
+                    saveToLocalStorage({ 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE': placementValue }, true);
+                    chrome.runtime.sendMessage({
+                        action: "update-contentscript-storage",
+                        key: 'DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE',
+                        value: placementValue
+                    });
+                }
+            };
+
+            mainBtn.addEventListener('pointerdown', handlePointerDown);
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+        }
 
         this.shadow.querySelector("#switch-hosts-btn").addEventListener("click", () => {
             const hostsOverlay = this.createHostsListOverlay({
@@ -769,8 +904,8 @@ export default class Start_VRR {
     }
 
     // --- SVGs --- //
-    svgSimplerReader2(size = 28) {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2F88FF" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path fill="#FFF" stroke="#fff" d="M20 24V17.0718L26 20.5359L32 24L26 27.4641L20 30.9282V24Z"/></g></svg>`
+    svgSimplerReader2(size = 18) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>`
     }
     svgClose(size = 22) {
         return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><path fill="currentColor" d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275q-.275-.275-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7q.275-.275.7-.275t.7.275l4.9 4.9l4.9-4.9q-.275-.275.7-.275t.7.275q.275.275.275.7t-.275.7L13.4 12l4.9 4.9q.275.275.275.7t-.275.7q-.275.275-.7.275t-.7-.275z"/></svg>`
@@ -810,12 +945,17 @@ export default class Start_VRR {
 
     createHTML() {
         const savedPlacement = VR_Reader.savedLocalStorageGlobal && VR_Reader.savedLocalStorageGlobal['DEFAULT_QUICK_ACCESS_CONTROLS_PANEL_PLACEMENT_STATE'];
-        const panelPlacement = (savedPlacement === 'middle' || savedPlacement === 'bottom') ? savedPlacement : 'bottom';
+        const parsed = parsePlacementState(savedPlacement);
+        const quadrant = getQuadrantPlacementCSS(parsed.x, parsed.y);
+        const inlineStyle = Object.entries(quadrant.style).map(([k, v]) => `${k}:${v}`).join(';');
+        const legacyClass = parsed.isLegacy ? `placement-${parsed.legacyType}` : '';
         return `  
-            <div id="quick-access" class="container placement-${panelPlacement}">
+            <div id="quick-access" class="container expand-${quadrant.expandDirection} align-${quadrant.alignSide} ${legacyClass}" style="${inlineStyle}">
                 <div class="wrapper">
                     <div id="simple-reader-btn" class="main-btn top-tooltip">
-                        ${this.svgSimplerReader2(28)}
+                        <div class="play-action">
+                            ${this.svgSimplerReader2(18)}
+                        </div>
                     </div>
                     <div class="controls-menu">
                         <div id="switch-hosts-btn" class="control-btn top-tooltip" data-tooltip="Switch Voice">
@@ -860,22 +1000,65 @@ style() {
         return `
             ${defaultCSS()}
             <style>
-                .container { position: fixed; right: 10px; bottom: 122px; z-index: 10000000000; }
-                .container.placement-bottom { bottom: 122px; }
-                .container.placement-middle { bottom: 50%; transform: translateY(60px); }
+                .container { position: fixed; z-index: 10000000000; }
+                .container.placement-bottom { bottom: 122px; right: 10px; }
+                .container.placement-middle { bottom: 50%; right: 10px; transform: translateY(60px); }
+
+                /* EXPAND DOWN RULES */
+                .container.expand-down .controls-menu {
+                    bottom: auto;
+                    top: calc(100% + 10px);
+                    transform: translateY(-10px);
+                }
+                .container.expand-down .wrapper:hover .controls-menu {
+                    transform: translateY(0);
+                }
+                .container.expand-down .selection-hint {
+                    bottom: auto;
+                    top: calc(100% + 12px);
+                    transform: translateY(-10px);
+                }
+                .container.expand-down .wrapper.hint-mode .selection-hint {
+                    transform: translateY(0);
+                }
+
+                /* ALIGN LEFT RULES */
+                .container.align-left .controls-menu {
+                    right: auto;
+                    left: 0;
+                }
+                .container.align-left .selection-hint {
+                    right: auto;
+                    left: 0;
+                    flex-direction: row-reverse;
+                }
+                .container.expand-down .top-tooltip[data-tooltip]:before {
+                    bottom: auto;
+                    top: 100%;
+                    transform: translate(-50%, 8px);
+                }
+                .container.expand-down .top-tooltip[data-tooltip]:after {
+                    top: 100%;
+                    bottom: auto;
+                    transform: translate(-50%, 3px);
+                    border-top: none;
+                    border-bottom: 5px solid hsla(0, 0%, 5%, 0.85);
+                }
+
+
                 .wrapper { position: relative; display: flex; justify-content: flex-end; align-items: center; }
                 
                 /* MAIN BUTTON STYLES */
                 .main-btn { 
-                    width: 40px; 
-                    height: 40px; 
+                    width: 34px; 
+                    height: 34px; 
                     background-color: #f0f0f054; 
                     border: 1px solid #cccccc61; 
                     border-radius: 50%; 
                     display: flex; 
                     align-items: center; 
                     justify-content: center; 
-                    cursor: pointer; 
+                    cursor: grab; 
                     box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
                     /* PERFORMANCE: Use specific properties instead of 'all' */
                     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease; 
@@ -884,11 +1067,45 @@ style() {
                     overflow: hidden; 
                     /* PERFORMANCE: Hints browser to prepare for animation */
                     will-change: transform;
+                    touch-action: none;
+                    user-select: none;
+                }
+
+                .main-btn.is-dragging,
+                .main-btn.is-dragging * {
+                    cursor: grabbing !important;
+                }
+                .main-btn.is-dragging {
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+                    background-color: #f0f0f0;
+                }
+
+                /* PLAY ACTION INNER CIRCLE */
+                .play-action {
+                    width: 20px;
+                    height: 20px;
+                    background-color: #1a1a2e;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: background-color 0.2s ease, transform 0.15s ease;
+                    z-index: 11;
+                    position: relative;
+                }
+                .play-action:hover {
+                    background-color: #7C3AED;
+                    transform: scale(1.08);
+                }
+                .play-action:active {
+                    transform: scale(0.92);
+                    transition: transform 0.08s ease;
                 }
 
                 /* HOVER: Scale up and solid background */
                 .main-btn:hover { 
-                    transform: scale(1.08); 
+                    transform: scale(1.04); 
                     background-color: #f0f0f0; 
                     box-shadow: 0 6px 12px rgba(0,0,0,0.25); 
                 }
@@ -902,15 +1119,14 @@ style() {
                     transition: opacity 0.2s ease, transform 0.2s ease;
                 }
 
-                /* PRESS: Instant tactile squash while the mouse is down */
-                .main-btn.pressing {
+                /* PRESS: Instant tactile squash on the inner play circle */
+                .play-action.pressing {
                     transform: scale(0.8);
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                    transition: transform 0.1s ease, box-shadow 0.1s ease;
+                    transition: transform 0.08s ease;
                 }
 
                 /* SPRING: Quick tactile snap back to rest after release */
-                .main-btn.springing {
+                .play-action.springing {
                     animation: vrr-spring 0.16s ease-out;
                 }
 
@@ -931,14 +1147,15 @@ style() {
                 }
 
                 /* --- OPTIMIZED SHEEN ANIMATION (GPU BASED) --- */
-                .main-btn::after {
+                .play-action::after {
                     content: "";
                     position: absolute;
                     top: 0;
                     left: 0; /* Pin to left, we will move it with transform */
                     width: 100%;
                     height: 100%;
-                    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+                    border-radius: 50%;
+                    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.6), transparent);
                     
                     /* Start position: Moved to the left (-100%) and skewed */
                     transform: translateX(-150%) skewX(-20deg);
@@ -948,7 +1165,7 @@ style() {
                 }
 
                 /* Trigger sheen on hover */
-                .main-btn:hover::after {
+                .play-action:hover::after {
                     /* End position: Move to the right */
                     transform: translateX(150%) skewX(-20deg);
 
@@ -957,12 +1174,11 @@ style() {
                 }
 
                 /* --- SELECTION-ACTIVE STATE (text highlighted on the page) --- */
-                .main-btn.selection-active svg path[fill="#2F88FF"] {
-                    fill: #7C3AED;
-                    transition: fill 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                .main-btn.selection-active .play-action {
+                    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.5);
                 }
 
-                .main-btn.selection-active::after {
+                .main-btn.selection-active .play-action::after {
                     animation: vrr-sheen-flash 0.6s ease-in-out;
                 }
 
@@ -1005,6 +1221,15 @@ style() {
 
                 .control-btn { width: 36px; height: 36px; background-color: #e2e8f0; color: #4A5568; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s ease, transform 0.2s ease; }
                 .control-btn:hover { background-color: #cbd5e0; transform: scale(1.1); }
+
+                /* DRAG STATE: Hide menu and hint during drag */
+                .wrapper.is-dragging .controls-menu,
+                .wrapper.is-dragging .selection-hint {
+                    opacity: 0 !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                    transition: none !important;
+                }
 
                 /* --- SELECTION HINT PANEL --- */
                 .selection-hint {
@@ -1072,12 +1297,27 @@ style() {
                     border-radius: 50%;
                     background-color: rgba(167, 139, 250, 0.18);
                     color: #a78bfa;
-                    animation: vrr-hint-bounce 1.4s ease-in-out infinite;
+                    animation: vrr-hint-bounce-down 1.4s ease-in-out infinite;
                 }
 
-                @keyframes vrr-hint-bounce {
+                /* When the hint appears below the button (expand-down), rotate the
+                   arrow 180deg so it points UP toward the play button. The box
+                   itself stays in the same place — only the arrow direction flips. */
+                .container.expand-down .selection-hint-arrow svg {
+                    transform: rotate(180deg);
+                }
+                .container.expand-down .selection-hint .selection-hint-arrow {
+                    animation-name: vrr-hint-bounce-up;
+                }
+
+                @keyframes vrr-hint-bounce-down {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(4px); }
+                }
+
+                @keyframes vrr-hint-bounce-up {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-4px); }
                 }
 
                 .wrapper.hint-mode .controls-menu {
@@ -1105,6 +1345,11 @@ style() {
                     transform: translateY(14px);
                     transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
                     transition-delay: 0s;
+                }
+                /* When hint is below button, fade upward instead */
+                .container.expand-down .wrapper.hint-mode.hint-leaving .selection-hint {
+                    transform: translateY(-14px);
+                }
                 }
 
                 .wrapper.hint-mode.hint-leaving .main-btn {

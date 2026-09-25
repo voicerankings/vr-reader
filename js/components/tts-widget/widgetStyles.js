@@ -30,9 +30,10 @@ export function stylePlayAnimation() {
             font-size: 10px;
             background-color: #111827;
             box-shadow: rgba(0, 121, 255, 1) -1px 0px 8px -2px;
-            position: fixed;
-            bottom: 90px;
-            right: 99px;
+            position: absolute;
+            right: calc(100% + 12px);
+            top: 50%;
+            transform: translateY(-50%);
             font-family: sans-serif;
             align-items: center;
             font-weight: bold;
@@ -41,6 +42,11 @@ export function stylePlayAnimation() {
             height: 27px;
             cursor: pointer;
             color: #dbdbdb;
+            z-index: 100;
+        }
+        #VR-Reader.align-left .mini-alert-box {
+            right: auto;
+            left: calc(100% + 12px);
         }
         .mini-alert-box.highlighted {
             display:block;
@@ -627,15 +633,68 @@ export function style() {
         margin: auto;
         box-shadow: rgb(0 0 0 / 16%) 0px 1px 4px;
         position: fixed;
-        bottom: 80px;
-        right: 20px;
         z-index:10000000000000000;
         max-height: 96vh;   
     }
-    #VR-Reader.placement-bottom { bottom: 140px; }
+    #PreviewContainer {
+        cursor: grab;
+        touch-action: none;
+    }
+    #VR-Reader.is-dragging, #VR-Reader.is-dragging * {
+        cursor: grabbing !important;
+    }
+    /* During drag: collapse the hover menu and expanded content panels.
+       The hover menu (OptionButtons) must collapse because it can dynamically
+       switch between slide-up and slide-down orientation, which would shift
+       the widget's position mid-drag. */
+    #VR-Reader.is-dragging #OptionButtons {
+        height: 0px !important;
+        min-height: 0px !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+        transition: none !important;
+    }
+    #VR-Reader.is-dragging .mouseover-view,
+    #VR-Reader.is-dragging .message-content {
+        display: none !important;
+        overflow: hidden !important;
+    }
+    #VR-Reader.is-dragging .content {
+        background: transparent !important;
+    }
+    #VR-Reader.is-dragging {
+        box-shadow: none !important;
+    }
+    #VR-Reader.placement-bottom { bottom: 140px; right: 20px; }
     #VR-Reader.placement-middle {
         transform: translateY(60px);
         bottom: 50%;
+        right: 20px;
+    }
+    #VR-Reader.expand-down #SectionSwitchTabContainer > div:last-child {
+        flex-direction: column-reverse !important;
+    }
+    #VR-Reader.align-left #SectionSwitchTabContainer {
+        flex-direction: row-reverse !important;
+    }
+    #VR-Reader.align-left .left-tooltip[data-tooltip]:before {
+        left: 100%;
+        margin-left: 12px;
+        transform: translateX(0);
+    }
+    #VR-Reader.align-left .left-tooltip[data-tooltip]:after {
+        left: auto;
+        right: -8px;
+        border-left: none;
+        border-right: 5px solid hsla(0, 0%, 5%, 0.8);
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+    }
+    #VR-Reader.align-left .left-tooltip[data-tooltip]:hover:before {
+        margin-left: 14px;
+    }
+    #VR-Reader.align-left .left-tooltip[data-tooltip]:hover:after {
+        margin-left: 0;
     }
 
     #VR-Reader.mouse-over{ opacity: 1 !important; }

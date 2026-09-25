@@ -14,7 +14,8 @@ vi.mock('../src/composables/useLocalSettings', () => ({
 
 vi.mock('../js/utils/helpers', () => ({
     saveToLocalStorage: vi.fn(() => Promise.resolve()),
-    readLocalStorage: vi.fn()
+    readLocalStorage: vi.fn(),
+    parsePlacementState: (val) => ({ x: 95, y: 85, isLegacy: true, legacyType: 'bottom' })
 }));
 
 import { readLocalStorage } from '../js/utils/helpers';
