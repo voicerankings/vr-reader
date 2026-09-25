@@ -11,7 +11,8 @@ import {
     setDomainSettings,
     getHostName,
     saveToLocalStorage,
-    getQuadrantPlacementCSS
+    getQuadrantPlacementCSS,
+    getSelectionText
 } from "../../utils/helpers";
 import { CONSTANTS } from "../../../js/constants/constants"
 import { toggleTab } from './TabController.js';
@@ -233,13 +234,23 @@ export async function initListeners(widget) {
         root.querySelector("#MoreListContainer").classList.remove("is-hidden")
     });
 
+    let cachedPlayButtonSelection = "";
+    root.querySelector("#PlayReadButton")?.addEventListener("pointerdown", () => {
+        cachedPlayButtonSelection = getSelectionText();
+    });
+
     root.querySelector("#PlayReadButton")?.addEventListener("click", () => {
         if (widget.voiceClass.speaking()) {
             widget.voiceClass.stop(true);
         } else {
-            let playbackIndex = widget.voiceClass.getPlaybackIndex()
-            widget.playbackClass.playbackSelectedIndex(playbackIndex)
-            widget.changePlayingButtonStatus(true)
+            const selText = cachedPlayButtonSelection.trim();
+            if (selText.length > 0 && selText !== (widget.voiceClass.output || "").trim()) {
+                widget.playAudioHighlightedText();
+            } else {
+                let playbackIndex = widget.voiceClass.getPlaybackIndex()
+                widget.playbackClass.playbackSelectedIndex(playbackIndex)
+                widget.changePlayingButtonStatus(true)
+            }
         }
     })
 
