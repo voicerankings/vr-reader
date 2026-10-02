@@ -27,6 +27,184 @@ export async function getErrorDetails(response) {
     } catch { return null; }
 }
 
+// ---------------------------------------------------------------------------
+// User-facing error messages
+//
+// Provider handlers throw rich Errors that carry the whole API response, which
+// is what we want for the diagnostics log and telemetry but far too noisy for a
+// toast. Everything funnels through buildFriendlyErrorMessage() so no provider
+// has to think about presentation.
+// ---------------------------------------------------------------------------
+
+const FRIENDLY_ERROR_MAX_LENGTH = 180;
+const FRIENDLY_ERROR_DETAIL_MAX_LENGTH = 120;
+
+// Where vendors hide the human-readable sentence inside an error body. Ordered
+// most-specific first: a body can carry both `message` and `error_message`, and
+// the nested `error.message` is usually the better one.
+const PROVIDER_MESSAGE_PATHS = [
+  ['error', 'message'],
+  ['error_message'],
+  ['err_msg'],
+  ['detail'],
+  ['message'],
+  ['errorMessage'],
+  ['error', 'error_description'],
+  ['error_description'],
+  ['Message']
+];
+
+// Keys that must never be echoed back to the user or into telemetry.
+const SENSITIVE_KEY_HINTS = ['key', 'token', 'secret', 'password', 'authorization'];
+
+function flattenToRecord(value) {
+  if (value === null || typeof value !== 'object') return null;
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const entry = value[key];
+    if (entry === null || entry === undefined) continue;
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+      out[key] = entry;
+    } else if (typeof entry === 'object' && !Array.isArray(entry)) {
+      Object.assign(out, flattenToRecord(entry));
+    }
+  }
+  return out;
+}
+
+// Pulls the provider's own sentence out of an arbitrarily shaped error body.
+export function extractProviderMessage(body) {
+  if (body === null || body === undefined) return '';
+
+  if (typeof body === 'string') {
+    const trimmed = body.trim();
+    // A bare JSON document as a string: parse it and try again.
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try { return extractProviderMessage(JSON.parse(trimmed)); } catch { /* fall through */ }
+    }
+    return trimmed;
+  }
+
+  if (typeof body !== 'object') return String(body);
+
+  for (const path of PROVIDER_MESSAGE_PATHS) {
+    let cursor = body;
+    for (const segment of path) {
+      if (cursor === null || typeof cursor !== 'object') { cursor = undefined; break; }
+      cursor = cursor[segment];
+    }
+    if (typeof cursor === 'string' && cursor.trim()) return cursor.trim();
+  }
+
+  // Some APIs return only a numeric error code. Say so rather than going silent.
+  const code = body.error_code ?? body.code ?? body.status;
+  if (code !== undefined && code !== null) return `Error code ${code}`;
+
+  return '';
+}
+
+// Masks anything that looks like a credential before the string reaches a toast,
+// the diagnostics log, or an innerHTML sink.
+function maskSecrets(text) {
+  return String(text)
+    .replace(/\b(sk|pk|rk|api|key|token)[-_][A-Za-z0-9_-]{8,}/gi, '$1-***')
+    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '***');
+}
+
+// One line, no markup: these strings are also injected into innerHTML by the
+// content-script toast, so angle brackets and quotes must not survive.
+function toPlainSingleLine(text) {
+    return String(text ?? '')
+        .replace(/[\u0000-\u001f]+/g, ' ')
+        .replace(/[<>]/g, '')
+        .replace(/["'`]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function truncate(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    const cut = text.slice(0, maxLength);
+    const lastSpace = cut.lastIndexOf(' ');
+    return `${(lastSpace > maxLength * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
+// Strips the "SomeProvider TTS API error: {json}" scaffolding that handlers wrap
+// around the useful part, so a fallback to error.message still reads well.
+function stripJsonTail(message) {
+  return String(message ?? '').replace(/\s*[:\-]?\s*\{[\s\S]*$/, '').trim();
+}
+
+function statusPhrase(statusCode) {
+  switch (statusCode) {
+    case 400: return 'rejected the request';
+    case 402: return 'reported a payment problem';
+    case 404: return 'does not recognise this request';
+    case 408: return 'timed out';
+    case 413: return 'rejected the request as too large';
+    case 422: return 'could not process the request';
+    case 429: return 'hit a rate limit';
+    case 500: return 'had an internal error';
+    case 502: return 'is having trouble upstream';
+    case 503: return 'is temporarily unavailable';
+    case 504: return 'timed out';
+    default:
+      return statusCode >= 500 ? 'is unavailable right now' : 'rejected the request';
+  }
+}
+
+/**
+ * Turns a provider Error into a short, plain, human sentence for the UI.
+ *
+ * @param {string} serviceName  the voice_service id, used as the subject
+ * @param {Error}  error        the thrown Error, with optional .statusCode
+ *                              and .responseBody set by the handler
+ * @returns {string} one line, safe for a toast, a modal and innerHTML
+ */
+export function buildFriendlyErrorMessage(serviceName, error) {
+  const subject = toPlainSingleLine(serviceName) || 'The provider';
+  const statusCode = Number(error && error.statusCode) || null;
+  const isKeyError = statusCode === 401 || statusCode === 403;
+
+  let lead;
+  if (isKeyError) {
+    lead = `${subject} rejected the API key`;
+  } else if (statusCode === 429) {
+    lead = `${subject} hit a rate limit`;
+  } else if (statusCode) {
+    lead = `${subject} ${statusPhrase(statusCode)}`;
+  } else {
+    lead = `${subject} could not be reached`;
+  }
+
+  // A key rejection never needs the provider's own wording: it is always some
+  // variation of "bad key", and repeating it just makes the toast longer. The
+  // full body stays available in Settings -> Error Logs.
+  const rawDetail = isKeyError ? '' : toPlainSingleLine(
+    extractProviderMessage(error && error.responseBody) || stripJsonTail(error && error.message)
+  );
+
+  // Sentences are joined with '. ', so drop any trailing terminator first to
+  // avoid "credentials.." and friends.
+  const detail = rawDetail.replace(/[.!?;:,\s]+$/, '');
+
+  const hint = (() => {
+    if (isKeyError) return 'Check the key saved for this provider.';
+    if (statusCode === 429) return 'Wait a moment, then try again.';
+    if (statusCode === 400 || statusCode === 404 || statusCode === 422) return 'Check this provider\u2019s options in BYOK settings.';
+    if (!statusCode) return 'Check your connection, then try again.';
+    return 'Try again in a moment.';
+  })();
+
+  const parts = [lead];
+  if (detail && !detail.toLowerCase().startsWith(lead.toLowerCase())) {
+    parts.push(truncate(detail, FRIENDLY_ERROR_DETAIL_MAX_LENGTH));
+  }
+  parts.push(hint);
+
+  return truncate(maskSecrets(parts.join('. ')), FRIENDLY_ERROR_MAX_LENGTH);
+}
+
 export async function openrouterTTS({ model, text, voice, speed, apiKey, providerOptions, responseFormat }) {
     const payload = {
         model,

@@ -6,7 +6,7 @@
  * background service worker. Handles authentication, error tracking, and routing 
  * for external TTS providers, saving ratings, fetching user settings, and more.
  */
-import { getHandler, getProviderUrl } from '../tts-providers/index.js';
+import { getHandler, getProviderUrl, buildFriendlyErrorMessage } from '../tts-providers/index.js';
 import { SERVICE_TO_STORAGE_KEY_MAP, readLocalStorage, CONSTANTS, API_NUXT_DOMAIN } from './config.js';
 import { contentScriptPorts } from './ports.js';
 import { enqueueErrorLog } from './error-telemetry.js';
@@ -218,9 +218,14 @@ const VRR_Requests = {
 
     } catch (error) {
       console.error(`Client-side TTS Error for ${serviceName}:`, error);
+      // `message` is what the user sees (toast, Test Key modal, player), so it is
+      // a short plain sentence. `rawMessage` keeps the provider's own wording for
+      // the diagnostics log and telemetry, where the detail is the point.
+      const friendlyMessage = buildFriendlyErrorMessage(serviceName, error);
       const errorObj = {
         status: 'error',
-        message: error.message,
+        message: friendlyMessage,
+        rawMessage: error.message,
         customErrorMessage: true,
         audioData: null, index, requestID,
         errorRequest: {
@@ -242,7 +247,7 @@ const VRR_Requests = {
           const log = {
             timestamp: Date.now(),
             serviceName: errorObj.errorRequest.serviceName || 'Unknown',
-            message: errorObj.message,
+            message: errorObj.rawMessage,
             request: errorObj.errorRequest,
             response: errorObj.errorResponse,
             statusCode: errorObj.errorStatusCode

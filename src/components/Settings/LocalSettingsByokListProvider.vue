@@ -289,12 +289,15 @@ async function testApiKey() {
       payload: payload
     });
 
-    saveRequest(callbackID, async ({ audioData, status, errorMessage }) => {
+    // The background returns the human-readable text as `message` (see the
+    // catch in js/background/api-client.js). It used to be destructured as
+    // `errorMessage`, which is never set, so the generic fallback always won.
+    saveRequest(callbackID, async ({ audioData, status, message, errorMessage }) => {
       isTesting.value = false;
 
       if (status === "error") {
         testStatus.value = 'error';
-        testMessage.value = errorMessage || 'API key test failed. Please check your key and try again.';
+        testMessage.value = message || errorMessage || 'API key test failed. Please check your key and try again.';
         return;
       }
 

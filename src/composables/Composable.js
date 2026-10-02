@@ -204,10 +204,13 @@ const completeRequest = function (callbackID, payload) {
     }
 
     if (payload.status === 'error') {
+      // `message` is the short sentence shown to the user; `rawMessage` is the
+      // provider's own wording. The diagnostics log wants the raw one, so the
+      // Settings -> Error Logs tab keeps the detail it had before.
       ttsErrorLogs.value.unshift({
         timestamp: Date.now(),
         serviceName: payload.errorRequest?.serviceName || payload.title || 'Unknown',
-        message: payload.message,
+        message: payload.rawMessage || payload.message,
         request: payload.errorRequest || null,
         response: payload.errorResponse || null,
         statusCode: payload.errorStatusCode || null
