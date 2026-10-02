@@ -3,13 +3,19 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 
 const GEMINI_MODEL = 'gemini-3.1-flash-tts-preview';
 const GEMINI_2_5_MODEL = 'gemini-2.5-flash-preview-tts';
+const GEMINI_3_8_MODEL = 'gemini-3.8-flash-tts';
 const OPENROUTER_MODEL = 'google/gemini-3.1-flash-tts-preview';
+const OPENROUTER_MODEL_3_8 = 'google/gemini-3.8-flash-tts';
 const GEMINI_PCM_SAMPLE_RATE = 24000;
 const GEMINI_MP3_BITRATE = 96;
 const PCM_CHUNK_SAMPLES = 1152;
 
 export const providerInfo = {
-    serviceNames: ['gemini-3-1-flash-tts', 'gemini-3-1-flash-tts-vd', 'gemini-2-5-flash-tts', 'gemini-2-5-flash-tts-vd'],
+    serviceNames: [
+        'gemini-3-1-flash-tts', 'gemini-3-1-flash-tts-vd',
+        'gemini-2-5-flash-tts', 'gemini-2-5-flash-tts-vd',
+        'gemini-3-8-flash-tts', 'gemini-3-8-flash-tts-extended', 'gemini-3-8-flash-tts-vd'
+    ],
     url: 'https://texttospeech.googleapis.com/v1/text:synthesize',
     handle
 };
@@ -18,8 +24,16 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
     const speakerId = serviceOptions.speaker_id;
     const includeAudioTimestamps = serviceOptions.includeAudioTimestamps;
     const isGemini25 = serviceName && serviceName.startsWith('gemini-2');
-    const storageKey = isGemini25 ? 'GEMINI_2_5_FLASH_TTS_API_KEY' : 'GEMINI_3_1_FLASH_TTS_API_KEY';
-    const model = isGemini25 ? GEMINI_2_5_MODEL : GEMINI_MODEL;
+    const isGemini38 = serviceName && serviceName.startsWith('gemini-3-8');
+    let storageKey = 'GEMINI_3_1_FLASH_TTS_API_KEY';
+    let model = GEMINI_MODEL;
+    if (isGemini25) {
+        storageKey = 'GEMINI_2_5_FLASH_TTS_API_KEY';
+        model = GEMINI_2_5_MODEL;
+    } else if (isGemini38) {
+        storageKey = 'GEMINI_3_8_FLASH_TTS_API_KEY';
+        model = GEMINI_3_8_MODEL;
+    }
 
     const apiKey = await getApiKey(storageKey, userApiKey);
 
@@ -34,6 +48,26 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
     const isGoogleGenAi = customOptions.apiKeyProvider && customOptions.apiKeyProvider.includes('generativelanguage.googleapis.com');
 
     if (isOpenRouter && !isGemini25) {
+        if (isGemini38) {
+            // 3.8 reads the input as a verbatim transcript and has no structured
+            // prompt form. OpenRouter's OpenAI-shaped payload carries no
+            // speech_metadata field, so delivery instructions ride along as a
+            // leading inline vocal tag instead.
+            const style = buildGeminiInstructions(serviceOptions, customOptions);
+            const input = style ? `[${style}] ${text}` : text;
+            const audioBuffer = await openrouterTTS({
+                model: OPENROUTER_MODEL_3_8,
+                text: input,
+                voice: finalVoice,
+                apiKey,
+                responseFormat: 'mp3'
+            });
+            return {
+                audioData: arrayBufferToBase64(audioBuffer),
+                speechMarks: includeAudioTimestamps ? await getExternalTimestamps(audioBuffer) : null
+            };
+        }
+
         const promptText = buildStructuredPrompt(text, serviceOptions, customOptions);
         const audioBuffer = await openrouterTTS({
             model: OPENROUTER_MODEL,
@@ -50,13 +84,17 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
     }
 
     if (isGoogleGenAi) {
-        const promptText = isGemini25
-            ? buildLegacyPrompt(text, serviceOptions, customOptions)
-            : buildStructuredPrompt(text, serviceOptions, customOptions);
+        const promptText = isGemini38
+            ? text
+            : (isGemini25
+                ? buildLegacyPrompt(text, serviceOptions, customOptions)
+                : buildStructuredPrompt(text, serviceOptions, customOptions));
         const audioBuffer = await googleGenAiSpeech({
             model,
             text: promptText,
             voiceName: finalVoice,
+            style: isGemini38 ? buildGeminiInstructions(serviceOptions, customOptions) : '',
+            isGemini38,
             apiKey
         });
         const mp3Buffer = await encodePcmToMp3(audioBuffer);
@@ -64,6 +102,14 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
             audioData: arrayBufferToBase64(mp3Buffer),
             speechMarks: includeAudioTimestamps ? await getExternalTimestamps(mp3Buffer) : null
         };
+    }
+
+    if (isGemini38) {
+        // Gemini 3.8 is served by the Gemini API only; there is no Cloud
+        // Text-to-Speech (text:synthesize) model for it.
+        const error = new Error('Gemini 3.8 Flash TTS is only available through the Gemini API or OpenRouter. Set the API Key Provider option for this service.');
+        error.requestPayload = { model, voice: finalVoice };
+        throw error;
     }
 
     const prompt = buildGeminiInstructions(serviceOptions, customOptions);
@@ -118,22 +164,29 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
     return { audioData: audioDataBase64, speechMarks };
 }
 
-async function googleGenAiSpeech({ model, text, voiceName, apiKey }) {
+async function googleGenAiSpeech({ model, text, voiceName, style, isGemini38, apiKey }) {
+    const part = { text };
+    const voiceConfig = isGemini38
+        ? { voice: voiceName }
+        : { prebuiltVoiceConfig: { voiceName } };
+
+    if (isGemini38 && style) {
+        // Gemini 3.8 treats the input as a verbatim transcript: delivery
+        // directions go in speech_metadata.style on the part, not in the text.
+        part.speech_metadata = { style };
+    }
+
     const payload = {
         model,
         contents: [
             {
-                parts: [{ text }]
+                parts: [part]
             }
         ],
         generationConfig: {
             responseModalities: ['AUDIO'],
             speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: {
-                        voiceName
-                    }
-                }
+                voiceConfig
             }
         }
     };
@@ -158,8 +211,18 @@ async function googleGenAiSpeech({ model, text, voiceName, apiKey }) {
     }
 
     const data = await response.json();
-    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!inlineData || !inlineData.data) {
+    // The audio part is not guaranteed to be first, and the REST response
+    // spells the field either inlineData or inline_data depending on revision.
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    let inlineData = null;
+    for (const candidatePart of parts) {
+        const found = candidatePart?.inlineData || candidatePart?.inline_data;
+        if (found && found.data) {
+            inlineData = found;
+            break;
+        }
+    }
+    if (!inlineData) {
         const error = new Error('Google GenAI did not return audio inlineData.');
         error.responseBody = data;
         error.requestPayload = payload;
@@ -233,10 +296,12 @@ export async function geminiSpeech(text, speakerId, includeAudioTimestamps, serv
         serviceOptions: {
             speaker_id: speakerId,
             includeAudioTimestamps,
+            voiceSpeedSetting: options.voiceSpeedSetting,
             languageCode: options.languageCode || 'en-US',
             voice_instructions: options.voice_instructions || ''
         },
         userApiKey: serviceKey,
-        customOptions: options
+        customOptions: options,
+        serviceName: options.serviceName
     });
 }

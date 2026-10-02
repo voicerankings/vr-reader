@@ -1,7 +1,7 @@
-import { getApiKey } from './_shared.js';
+import { getApiKey, escapeSSML } from './_shared.js';
 
 export const providerInfo = {
-    serviceNames: ['Speechify'],
+    serviceNames: ['Speechify', 'Speechify-Simba-3-2'],
     url: 'https://api.speechify.ai/v1/audio/speech',
     handle
 };
@@ -48,6 +48,41 @@ function resolveModelAndVoice(speaker, explicitModel) {
     }
 
     return { voice_id: voice, model };
+}
+
+// Speechify-Simba-3-2 stores Speechify's own voice id verbatim (e.g. `geffen_32`
+// or `alec`) and pins the model in the request body. Stripping a `-{model}`
+// suffix or re-appending `_32` here would corrupt those ids.
+function resolveVerbatimVoice(speaker, model) {
+    return { voice_id: String(speaker || '').trim().toLowerCase(), model };
+}
+
+// Speechify-Simba-3-2 exposes rate, pitch, volume and the 13 emotion presets
+// through SSML. When nothing deviates from the default the text is sent bare so
+// Speechify is not asked to interpret a no-op prosody wrapper, and text that
+// already carries markup is left alone rather than escaped or double-wrapped.
+function buildSimba32Ssml(text, customOptions, fallbackRatePercent) {
+    const hasMarkup = /<[a-zA-Z/]/.test(text);
+    const rate = Number(customOptions.rate);
+    const ratePercent = Number.isFinite(rate) && rate > 0
+        ? Math.round((rate - 1) * 100)
+        : fallbackRatePercent;
+    const pitch = customOptions.pitch || 'medium';
+    const volume = customOptions.volume || 'medium';
+    const emotion = customOptions.emotion || 'none';
+
+    if (ratePercent === 0 && pitch === 'medium' && volume === 'medium' && emotion === 'none') {
+        return hasMarkup ? `<speak>${text}</speak>` : `<speak>${escapeSSML(text)}</speak>`;
+    }
+
+    let content = hasMarkup ? text : escapeSSML(text);
+    if (ratePercent !== 0 || pitch !== 'medium' || volume !== 'medium') {
+        content = `<prosody rate="${ratePercent}%" pitch="${pitch}" volume="${volume}">${content}</prosody>`;
+    }
+    if (emotion !== 'none' && !hasMarkup) {
+        content = `<speechify:style emotion="${emotion}">${content}</speechify:style>`;
+    }
+    return `<speak>${content}</speak>`;
 }
 
 function parseSseEvent(rawEvent) {
@@ -124,25 +159,32 @@ function mapSpeechMarks(marks) {
     }));
 }
 
-async function handle({ text, serviceOptions, userApiKey, customOptions = {} }) {
+async function handle({ text, serviceOptions, userApiKey, serviceName, customOptions = {} }) {
     const speaker = serviceOptions.speaker_id;
     const speed = serviceOptions.voiceSpeedSetting;
 
-    const apiKey = await getApiKey('SPEECHIFY_API_KEY', userApiKey);
+    // Speechify-Simba-3-2 is pinned to simba-3.2 and reads its own key slot, so
+    // a user can hold a Simba 3.2 key without replacing their legacy Simba key.
+    const pinnedSimba32 = serviceName === 'Speechify-Simba-3-2';
+    const apiKey = await getApiKey(pinnedSimba32 ? 'SPEECHIFY_SIMBA_3_2_API_KEY' : 'SPEECHIFY_API_KEY', userApiKey);
     if (!apiKey) throw new Error("Speechify API Key is missing.");
 
     const speedRate = ((Number.isFinite(Number(speed)) ? Number(speed) : 1) - 1) * 100;
 
-    const { voice_id, model } = resolveModelAndVoice(speaker, serviceOptions.model || customOptions?.model);
+    const { voice_id, model } = pinnedSimba32
+        ? resolveVerbatimVoice(speaker, 'simba-3.2')
+        : resolveModelAndVoice(speaker, serviceOptions.model || customOptions?.model);
 
     const requestPayload = {
-        input: `<speak><prosody rate="${speedRate}%">${text}</prosody></speak>`,
+        input: pinnedSimba32
+            ? buildSimba32Ssml(text, customOptions, speedRate)
+            : `<speak><prosody rate="${speedRate}%">${text}</prosody></speak>`,
         voice_id: voice_id,
         model: model,
         output_format: OUTPUT_FORMAT,
     };
 
-    if (serviceOptions.languageCode) {
+    if (!pinnedSimba32 && serviceOptions.languageCode) {
         requestPayload.language = serviceOptions.languageCode;
     }
 
@@ -190,6 +232,12 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {} }) 
     };
 }
 
-export async function speechifySpeech(text, speaker, speed, serviceKey) {
-    return handle({ text, serviceOptions: { speaker_id: speaker, voiceSpeedSetting: speed }, userApiKey: serviceKey });
+export async function speechifySpeech(text, speaker, speed, serviceKey, options = {}) {
+    return handle({
+        text,
+        serviceOptions: { speaker_id: speaker, voiceSpeedSetting: speed, model: options.model },
+        userApiKey: serviceKey,
+        serviceName: options.serviceName,
+        customOptions: options
+    });
 }

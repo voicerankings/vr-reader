@@ -1,17 +1,17 @@
-# 🔊 Supported TTS Models & Providers
+﻿# ðŸ”Š Supported TTS Models & Providers
 
 This guide lists every text-to-speech (TTS) model and provider supported by **VoiceRankings Reader**, and how each one obtains its API key.
 
-- 🧩 **Single Provider Key** — sign up directly with the provider and use its own API key.
-- 🎟️ **One Key, Multiple Providers (Aggregator)** — a single API key unlocks models from many different vendors at once.
+- ðŸ§© **Single Provider Key** â€” sign up directly with the provider and use its own API key.
+- ðŸŽŸï¸ **One Key, Multiple Providers (Aggregator)** â€” a single API key unlocks models from many different vendors at once.
 
 Voice previews and the full, day-to-day list of available voices are served from the [VoiceRankings](https://voicerankings.com) voice catalog.
 
 ---
 
-## 🧩 Single Provider Key
+## ðŸ§© Single Provider Key
 
-Sign up for an account with the provider and paste the API key it gives you into **Settings**. The key is stored locally in `chrome.storage.local` — it is **never** sent to VoiceRankings servers.
+Sign up for an account with the provider and paste the API key it gives you into **Settings**. The key is stored locally in `chrome.storage.local` â€” it is **never** sent to VoiceRankings servers.
 
 | Provider | Settings Key | Models | Voice List
 | :--- | :--- | :--- | :--- |
@@ -38,14 +38,24 @@ Sign up for an account with the provider and paste the API key it gives you into
 | **Inworld** | `INWORLD_API_KEY` | `inworld-tts-1.5-mini`, `inworld-tts-1.5-max`, `inworld-tts-2` | [voice list](https://voicerankings.com/filters?service=Inworld) |
 | **AsyncAI** | `ASYNCAI_API_KEY` | `async_flash_v1.0`,`async_flash_v1.5`, `async_pro_v1.0` | [voice list](https://voicerankings.com/filters?service=AsyncAI) |
 | **Resemble AI** | `RESEMBLEAI_API_KEY` | Your custom cloned voice UUIDs | [voice list](https://voicerankings.com/filters?service=ResembleAI) |
+| **Deepgram Flux** | `DEEPGRAM_FLUX_API_KEY` | `flux-{voice}-{language}` voices, e.g. `flux-hannah-en` | [voice list](https://voicerankings.com/filters?service=Deepgram-Flux) |
+| **Gemini 3.8 Flash TTS / extended / vd** | `GEMINI_3_8_FLASH_TTS_API_KEY` | `gemini-3.8-flash-tts` (Gemini API or OpenRouter only) | [voice list](https://voicerankings.com/filters?service=gemini-3-8-flash-tts) |
+| **Speechify Simba 3.2** | `SPEECHIFY_SIMBA_3_2_API_KEY` | `simba-3.2` | [voice list](https://voicerankings.com/filters?service=Speechify-Simba-3-2) |
+| **Murf Falcon 2** | `MURFAI_FALCON_2_API_KEY` | `falcon-2` (streaming) | [voice list](https://voicerankings.com/filters?service=MurfAI-Falcon-2) |
+| **Inworld TTS 2** | `INWORLD_TTS_2_API_KEY` | `inworld-tts-2` | [voice list](https://voicerankings.com/filters?service=inworld-tts-2) |
+| **Soniox TTS V2** | `SONIOX_TTS_V2_API_KEY` | `tts-rt-v2` | [voice list](https://voicerankings.com/filters?service=Soniox-TTS-V2) |
 
 > 💡 Deepgram models are selected by voice ID: voices matching `aura-1-*` use the Aura 1 key, voices matching `aura-2-*` use the Aura 2 key.
 
+> 💡 Sibling services keep separate keys, so one OpenRouter balance can cover Deepgram Aura 2, Deepgram Flux and Gemini 3.8 at the same time. Set each service's **API Key Provider** to the OpenRouter model id to route it there.
+
+> 💡 Word timestamps are native for Speechify Simba 3.2 and Inworld TTS 2. Deepgram Flux, Murf Falcon 2 and Soniox TTS V2 return none of their own — set a Deepgram (`DEEPGRAM_STT_API_KEY`), Whisper (`OPENAI_STT_API_KEY`) or OpenRouter (`OPENROUTER_STT_API_KEY`) key under **Settings → Word Timestamps** to derive them.
+
 ---
 
-## 🎟️ One Key, Multiple Providers (Aggregator)
+## ðŸŽŸï¸ One Key, Multiple Providers (Aggregator)
 
-Sign up for **one** account with an aggregator and use that single API key to access models from many different vendors — no per-provider accounts needed.
+Sign up for **one** account with an aggregator and use that single API key to access models from many different vendors â€” no per-provider accounts needed.
 
 ### OpenRouter
 
@@ -55,13 +65,15 @@ One **OpenRouter** API key (`https://openrouter.ai`) provides access to all of t
 | :--- | :--- |
 | `deepgram/aura-2` | Deepgram Aura 2 |
 | `google/gemini-3.1-flash-tts-preview` | Google Gemini 3.1 Flash TTS |
+| `google/gemini-3.8-flash-tts` | Google Gemini 3.8 Flash TTS |
+| `deepgram/flux-tts` | Deepgram Flux TTS |
 | `x-ai/grok-voice-tts-1.0` | Grok TTS |
 | `microsoft/mai-voice-2` | Microsoft MAI Voice 2 |
 | `mistralai/voxtral-mini-tts-2603` | Mistral Voxtral |
 | `canopylabs/orpheus-3b-0.1-ft` | Canopy Labs Orpheus |
 | `hexgrad/kokoro-82m` | Kokoro |
 
-> 🔧 **Any OpenRouter model can be used.** Enter the key in Settings as `openrouter.com/<model-id>` and the extension routes all matching providers through that model (e.g. `openrouter.com/deepgram/aura-2`, `openrouter.com/google/gemini-3.1-flash-tts-preview`).
+> ðŸ”§ **Any OpenRouter model can be used.** Enter the key in Settings as `openrouter.com/<model-id>` and the extension routes all matching providers through that model (e.g. `openrouter.com/deepgram/aura-2`, `openrouter.com/google/gemini-3.1-flash-tts-preview`).
 
 OpenRouter also powers optional word-level **speech timing** (STT) for playback highlighting, including `openai/gpt-transcribe`, `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1`, `openai/whisper-large-v3`, `openai/whisper-large-v3-turbo`, `x-ai/grok-stt-1.0`, `mistralai/voxtral-mini-transcribe`, and `qwen/qwen3-asr-flash-2026-02-10`.
 
@@ -75,11 +87,11 @@ One **DeepInfra** API key (`https://deepinfra.com`) provides access to the follo
 | `canopylabs/orpheus-3b-0.1-ft` | Canopy Labs Orpheus |
 | `mimo-v2.5-tts` | Xiaomi MiMo V2.5 |
 
-> 💡 Only the models above are supported on DeepInfra — the extension calls each hardcoded inference endpoint directly.
+> ðŸ’¡ Only the models above are supported on DeepInfra â€” the extension calls each hardcoded inference endpoint directly.
 
 ---
 
-## 🔑 Getting Keys & Where to Enter Them
+## ðŸ”‘ Getting Keys & Where to Enter Them
 
 1. Create an account on the provider's site and generate an API key.
    - Direct providers: sign up on each provider's dashboard (OpenAI, Deepgram, Azure, Google Cloud, Grok/xAI, Mistral, Qwen, StepFun, Rime, Speechify, Murf, Inworld, AsyncAI, Resemble, Xiaomi, Amazon).

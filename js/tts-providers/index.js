@@ -23,6 +23,7 @@ import { providerInfo as _grok } from './grok.js';
 import { providerInfo as _mistral } from './mistral-voxtral.js';
 import { providerInfo as _gemini } from './gemini.js';
 import { providerInfo as _qwen } from './qwen.js';
+import { providerInfo as _soniox } from './soniox.js';
 
 // --- Build handler map ---
 const _providers = [
@@ -30,7 +31,7 @@ const _providers = [
     _amazonPolly, _amazonSpeech, _azure, _azureMai,
     _google, _googleChirp, _speechify, _murf, _inworld,
     _async, _kokoro, _rime, _rimeArcana, _mimo,
-    _stepfun, _grok, _mistral, _gemini, _qwen
+    _stepfun, _grok, _mistral, _gemini, _qwen, _soniox
 ];
 
 const _handlerMap = {};
@@ -78,3 +79,4 @@ export * from './grok.js';
 export * from './mistral-voxtral.js';
 export * from './gemini.js';
 export * from './qwen.js';
+export * from './soniox.js';
