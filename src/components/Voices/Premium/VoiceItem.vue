@@ -268,7 +268,7 @@ function removeFromCollection(){
 
 function gotoVoicePage(){
     chrome.runtime.sendMessage({ action: "sameTabNavigateTo", 
-    url:`https://${API_NUXT_DOMAIN.value}/voice/${props.voice.voice_service}/${props.voice.voice_gender}/${props.voice.voice_speaker_id}`});
+    url:`https://${API_NUXT_DOMAIN.value}/voice/${props.voice.voice_service}/${props.voice.voice_gender}/${props.voice.voice_speaker_id}/overview`});
 }
 
 function selectVoiceAction(){

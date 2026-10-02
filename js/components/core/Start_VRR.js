@@ -1801,7 +1801,7 @@ updateTooltipPosition(shadow) {
                     if(voice.voice_name === null || voice.voice_id === null || voice.voice_gender === null) return '';
                     const genderClass = voice.voice_gender.toLowerCase() === 'male' ? 'male' : 'female';
                     const langInfo = this.getLanguageInfo(voice.voice_language_codes);
-                    const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}`;
+                    const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}/overview`;
                     const isDefault = this.defaultVoiceId === voice.voice_id;
                     
                     return `
@@ -1863,7 +1863,7 @@ updateTooltipPosition(shadow) {
             const html = chunk.map(voice => {
                 const genderClass = voice.voice_gender.toLowerCase() === 'male' ? 'male' : 'female';
                 const langInfo = this.getLanguageInfo(voice.voice_language_codes);
-                const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}`;
+                const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}/overview`;
                 const isDefault = this.defaultVoiceId === voice.voice_id;
                 
                 return `
@@ -1968,7 +1968,7 @@ updateTooltipPosition(shadow) {
                         const html = chunk.map(voice => {
                             const genderClass = voice.voice_gender.toLowerCase() === 'male' ? 'male' : 'female';
                             const langInfo = this.getLanguageInfo(voice.voice_language_codes);
-                            const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}`;
+                            const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}/overview`;
                             const isDefault = this.defaultVoiceId === voice.voice_id;
                             
                             return `

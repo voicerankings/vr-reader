@@ -836,7 +836,7 @@ async searchVoices(query) {
             ? `<img class="service-icon" src="https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${voice.voice_service_alias}&size=32" alt="${voice.voice_service}" onerror="this.style.display='none'"/>`
             : '';
         
-        const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}`;
+        const detailsUrl = `https://${APP_WEB_DOMAIN}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}/overview`;
         const isDefault = this.defaultVoiceId === voice.voice_id;
         
         return `

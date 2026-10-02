@@ -304,7 +304,7 @@ function loadRecentSearches() {
 
 function gotoVoicePage(voice){
     chrome.runtime.sendMessage({ action: "sameTabNavigateTo",
-    url:`https://${API_NUXT_DOMAIN.value}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}`});
+    url:`https://${API_NUXT_DOMAIN.value}/voice/${voice.voice_service}/${voice.voice_gender}/${voice.voice_speaker_id}/overview`});
 }
 
 function selectVoice(voice) {
