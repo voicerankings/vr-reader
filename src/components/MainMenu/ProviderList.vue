@@ -34,22 +34,48 @@ const apiKeysStatus = ref({});
 const apiKeyValues = ref({});
 
 // --- COMPUTED PROPERTIES ---
-const sortedProviders = computed(() => {
-  return [...providersList.value].sort((a, b) => {
-    const aHasKey = hasApiKey(a.voice_service);
-    const bHasKey = hasApiKey(b.voice_service);
-    if (aHasKey && !bHasKey) {
-      return -1;
-    }
-    if (!aHasKey && bHasKey) {
-      return 1;
-    }
-    return 0;
-  });
+// Every provider is listed at once so the panel doubles as a catalogue of what
+// is available. Two things are hidden:
+//   * providers with no indexed voices, which would only ever open to an empty
+//     list (currently just gemini-3-8-flash-tts-vd),
+//   * providers with no storage_key, which have no API key to manage here.
+// providersList itself is left intact: the storage-key and concurrency maps
+// pushed to the background must still cover the hidden entries.
+const visibleProviders = computed(() => {
+  const list = Array.isArray(providersList.value) ? providersList.value : [];
+  return list
+    .filter(p => p && Number(p.voice_count) > 0 && p.storage_key)
+    .slice()
+    .sort((a, b) => {
+      // Configured providers first so a working setup is easy to find, then
+      // alphabetical. Both halves are stable, so the list never reshuffles
+      // arbitrarily the way an unsorted shelf did.
+      const aConfigured = hasApiKey(a.voice_service) ? 1 : 0;
+      const bConfigured = hasApiKey(b.voice_service) ? 1 : 0;
+      if (aConfigured !== bConfigured) return bConfigured - aConfigured;
+      return String(a.voice_service).localeCompare(String(b.voice_service));
+    });
 });
 
-const initialProviders = computed(() => sortedProviders.value.slice(0, 5));
-const remainingProviders = computed(() => sortedProviders.value.slice(5));
+const totalVisibleVoices = computed(() =>
+  visibleProviders.value.reduce((sum, p) => sum + (Number(p.voice_count) || 0), 0)
+);
+
+// The panel sits above Favorites and Read later in the nav, so it opens
+// collapsed: showing all 36 at once pushed those entries off the bottom of a
+// short panel and every visit became a scroll. The button reveals the rest on
+// demand and keeps the state for the rest of the session.
+const COLLAPSED_PROVIDER_COUNT = 5;
+
+const hiddenProviderCount = computed(() =>
+  Math.max(0, visibleProviders.value.length - COLLAPSED_PROVIDER_COUNT)
+);
+
+const displayedProviders = computed(() =>
+  showAllProviders.value
+    ? visibleProviders.value
+    : visibleProviders.value.slice(0, COLLAPSED_PROVIDER_COUNT)
+);
 
 const selectedProviderData = computed(() => {
   if (!selectedProvider.value) return null;
@@ -211,16 +237,36 @@ function hasApiKey(serviceName) {
   return apiKeysStatus.value[serviceName] === true;
 }
 
+function formatCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return n.toLocaleString('en-US');
+}
+
+function escapeTooltipHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// The voice count is now a column on the row itself, so it is left out here.
+// Everything else stays hover-only: it is true but secondary, and the panel has
+// no room for it inline.
 function generateTooltipContent(provider) {
+  const heading = escapeTooltipHtml(provider.voice_service);
+  const alias = provider.voice_service_alias
+    ? `<div class="text-[11px] opacity-70 mb-1.5">${escapeTooltipHtml(provider.voice_service_alias)}</div>`
+    : '';
+
   const badges = [];
   if (hasApiKey(provider.voice_service)) {
     badges.push(`<span class="bg-green-400 text-white text-xs font-bold px-2.5 py-0.5 rounded-full shadow-sm">🔑 API Key Saved</span>`);
   }
-  if (provider.voice_count > 0) {
-    badges.push(`<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">${provider.voice_count} voices</span>`);
-  }
   if (provider.language_count > 0) {
-    badges.push(`<span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">${provider.language_count} languages</span>`);
+    badges.push(`<span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">${Number(provider.language_count)} languages</span>`);
   }
   if (provider.voice_has_word_timestamp_support) {
     badges.push(`<span class="bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">✅word highlights</span>`);
@@ -228,7 +274,11 @@ function generateTooltipContent(provider) {
   if (provider.voice_has_voice_speed_support) {
     badges.push(`<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">✅voice speed change</span>`);
   }
-  return `<div class="flex flex-wrap items-center gap-1.5 p-1">${badges.join(' ')}</div>`;
+  const badgeRow = badges.length
+    ? `<div class="flex flex-wrap items-center gap-1.5">${badges.join(' ')}</div>`
+    : '';
+
+  return `<div class="p-1"><div class="font-semibold text-xs mb-1">${heading}</div>${alias}${badgeRow}</div>`;
 }
 
 function goToVoices(routeName, service) {
@@ -318,67 +368,100 @@ async function handleApiKeySaved() {
       Could not load providers.
     </div>
 
-    <!-- Provider "Shelf" Layout -->
-    <div v-else-if="providersList.length > 0" class="flex flex-wrap gap-2 pr-2 custom-scrollbar">
-      <!-- Always show the first 6 providers -->
-      <button
-        v-for="provider in initialProviders"
-        :key="provider.voice_service"
-        v-tooltip="{ content: generateTooltipContent(provider), html: true }"
-        @click="openProviderModal(provider.voice_service)"
-        :class="[
-          hasApiKey(provider.voice_service) 
-            ? 'bg-green-900/30 hover:bg-green-900/50 border border-green-500/40 text-green-100 shadow-sm shadow-green-900/20' 
-            : 'bg-gray-800/80 hover:bg-gray-700 border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-white shadow-sm'
-        ]"
-        class="flex items-center cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 ease-in-out no-underline hover:scale-105"
-      >
-        <img
-          v-if="provider.voice_service_alias"
-          :src="`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${provider.voice_service_alias}&size=32`"
-          :alt="`${provider.voice_service} logo`"
-          class="w-4 h-4 mr-2 flex-shrink-0"
-        />
-        <span>{{ provider.voice_service }}</span>
-      </button>
+    <!-- Provider List Layout -->
+    <div v-else-if="visibleProviders.length > 0">
+      <div class="flex items-baseline justify-between px-3 pb-1.5">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          Providers
+          <span class="text-gray-500">({{ visibleProviders.length }})</span>
+        </span>
+        <span class="text-[11px] text-gray-500 tabular-nums">
+          {{ formatCount(totalVisibleVoices) }} voices
+        </span>
+      </div>
 
-      <!-- Show the rest of the providers when toggled -->
-      <template v-if="showAllProviders">
-        <button
-          v-for="provider in remainingProviders"
-          :key="provider.voice_service"
-          v-tooltip="{ content: generateTooltipContent(provider), html: true }"
-          @click="openProviderModal(provider.voice_service)"
-          :class="[
-            hasApiKey(provider.voice_service) 
-              ? 'bg-green-900/30 hover:bg-green-900/50 border border-green-500/40 text-green-100 shadow-sm shadow-green-900/20' 
-              : 'bg-gray-800/80 hover:bg-gray-700 border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-white shadow-sm'
-          ]"
-          class="flex cursor-pointer items-center px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 ease-in-out no-underline hover:scale-105"
+      <ul class="flex flex-col">
+        <li v-for="provider in displayedProviders" :key="provider.voice_service">
+          <button
+            v-tooltip="{ content: generateTooltipContent(provider), html: true }"
+            @click="openProviderModal(provider.voice_service)"
+            class="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer no-underline transition-colors duration-150 text-left"
+            :class="hasApiKey(provider.voice_service)
+              ? 'bg-green-900/25 hover:bg-green-900/40'
+              : 'hover:bg-white/[0.07]'"
+          >
+            <img
+              v-if="provider.voice_service_alias"
+              :src="`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${provider.voice_service_alias}&size=32`"
+              :alt="`${provider.voice_service} logo`"
+              class="w-4 h-4 flex-shrink-0 rounded-sm"
+              loading="lazy"
+              @error="$event.target.style.visibility = 'hidden'"
+            />
+            <span
+              v-else
+              class="w-4 h-4 flex-shrink-0 rounded-sm bg-gray-700/60"
+              aria-hidden="true"
+            ></span>
+
+            <span
+              class="flex-1 min-w-0 truncate text-xs font-semibold tracking-wide"
+              :class="hasApiKey(provider.voice_service) ? 'text-green-100' : 'text-gray-300'"
+            >
+              {{ provider.voice_service }}
+            </span>
+
+            <!-- Fixed-width right column so every count lines up vertically. -->
+            <span
+              class="w-12 flex-shrink-0 text-right text-xs tabular-nums text-gray-400"
+            >
+              {{ formatCount(provider.voice_count) }}
+            </span>
+
+            <!-- Fixed-width slot keeps the counts aligned whether or not a key is saved. -->
+            <span class="w-4 flex-shrink-0 flex items-center justify-center">
+              <svg
+                v-if="hasApiKey(provider.voice_service)"
+                class="w-3.5 h-3.5 text-green-400"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                aria-label="API key saved"
+              >
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+            </span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- Reveal the providers past the first few, so Favorites and Read later
+           stay reachable without scrolling past the whole catalogue. -->
+      <button
+        v-if="hiddenProviderCount > 0 || showAllProviders"
+        type="button"
+        @click="showAllProviders = !showAllProviders"
+        :aria-expanded="showAllProviders"
+        class="mt-1 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] transition-colors duration-150 cursor-pointer"
+      >
+        <span>{{ showAllProviders ? 'Show fewer' : `Show all ${visibleProviders.length} providers` }}</span>
+        <svg
+          class="w-3.5 h-3.5 transition-transform duration-200"
+          :class="showAllProviders ? 'rotate-180' : ''"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
         >
-          <img
-            v-if="provider.voice_service_alias"
-            :src="`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${provider.voice_service_alias}&size=32`"
-            :alt="`${provider.voice_service} logo`"
-            class="w-4 h-4 mr-2 flex-shrink-0"
-          />
-          <span>{{ provider.voice_service }}</span>
-        </button>
-      </template>
-
-      <!-- "More Providers" Divider Button -->
-      <button
-        v-if="providersList.length > 6 && !showAllProviders"
-        @click="showAllProviders = true"
-        class="w-full text-center text-xs text-gray-400 hover:text-white font-semibold py-1 mt-1 bg-white/5 hover:bg-white/10 rounded-md transition-colors duration-200"
-      >
-        ... More Providers ({{ providersList.length }}) ...
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+        </svg>
       </button>
 
       <!-- OpenRouter quick setup -->
-      <OpenRouterQuickSetup @api-keys-refreshed="loadApiKeysStatus" />
+      <div class="px-1 pt-1">
+        <OpenRouterQuickSetup @api-keys-refreshed="loadApiKeysStatus" />
+      </div>
     </div>
-    
+
     <!-- Empty State -->
     <div v-else class="text-center text-gray-500 text-sm py-4">
       No voice providers found.
@@ -545,24 +628,6 @@ a, button {
 .slide-right-leave-to {
   transform: translateX(100%);
   opacity: 0;
-}
-
-/* Custom scrollbar for provider list */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Styled scrollbar for API Key Management panel */
