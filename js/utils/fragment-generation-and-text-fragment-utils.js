@@ -2190,6 +2190,12 @@ globalThis.removeMarks = (marks) => {
   }
 };
 
+// Exposed so the sentence highlighter's anchor capture can apply the same
+// visibility rule the matcher uses. Without it the anchor can land on a hidden
+// tooltip, an off-screen menu or a <script> body, which then overshoots the real
+// reading position and sends the next-sentence search to the wrong paragraph.
+globalThis.isNodeVisible = isNodeVisible;
+
 
 
 globalThis.markRangeTextOnly = (range) => {

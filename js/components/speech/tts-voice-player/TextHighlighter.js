@@ -168,12 +168,73 @@ export default class TextHighlighter {
             walker.currentNode = lastMark;
             let node = walker.nextNode();
             while (node) {
-                if (!lastMark.contains(node) && node.textContent && node.textContent.trim().length > 0) {
+                if (!lastMark.contains(node) &&
+                    node.textContent && node.textContent.trim().length > 0 &&
+                    TextHighlighter._isAnchorCandidate(node)) {
                     return { node, offset: 0 };
                 }
                 node = walker.nextNode();
             }
 
+            return { node: boundary.startContainer, offset: boundary.startOffset };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Guards against the anchor overshooting the real reading position.
+     *
+     * The walk to "the first text node after the mark" is purely document-order,
+     * so without this it happily returns a node from a <script>/<style> body, a
+     * hidden tooltip, an off-screen dropdown, or an aria-hidden overlay. Every
+     * one of those sits *after* the sentence the user is actually reading, and
+     * an anchor past the target makes the next-sentence search skip it entirely
+     * and land on an unrelated duplicate further down the page.
+     */
+    static _isAnchorCandidate(node) {
+        const parent = node.parentElement;
+        if (!parent) return false;
+
+        // Never anchor on machine-readable or chrome text.
+        if (parent.closest('script, style, noscript, template, textarea, svg, head')) return false;
+
+        // The extension's own widgets live in document.body too and are not page
+        // content, so anchoring inside them sends the search off the article.
+        if (parent.closest('[id^="vrr-"], .vrr-widget, #SelectPlayback')) return false;
+
+        // aria-hidden content is presentational (tooltips, sr-only duplicates).
+        if (parent.closest('[aria-hidden="true"]')) return false;
+
+        // Inline/attribute hiding. checkVisibility() is the stronger check but it
+        // depends on layout being resolved, so it cannot be the only guard.
+        for (let el = parent; el && el !== document.body; el = el.parentElement) {
+            if (el.hidden) return false;
+            const style = el.style;
+            if (style && (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')) return false;
+        }
+
+        // Same visibility rule the matcher itself applies.
+        if (typeof globalThis.isNodeVisible === 'function' && !globalThis.isNodeVisible(node)) return false;
+
+        return true;
+    }
+
+    /**
+     * Anchor for the text immediately following a highlight result. Used by the
+     * shortening loop so the tail of a partially matched sentence is searched
+     * from just after the part that was found, keeping it contiguous.
+     */
+    _captureAnchorAfterResult(result) {
+        const marks = result?.processedDirectives?.[0];
+        if (!marks || !marks.length) return null;
+
+        const lastMark = marks[marks.length - 1];
+        if (!lastMark || !lastMark.parentNode) return null;
+
+        try {
+            const boundary = document.createRange();
+            boundary.setStartAfter(lastMark);
             return { node: boundary.startContainer, offset: boundary.startOffset };
         } catch (e) {
             return null;
@@ -272,10 +333,16 @@ export default class TextHighlighter {
         const anchoredMarks = anchoredRes.processedDirectives[0];
         const fallbackMarks = fallbackRes.processedDirectives[0];
 
-        // Prefer the document-first result when it exists, is at/after the
-        // anchor, and is earlier in the DOM than the anchored result.
+        // Prefer the document-first result when it exists and lands earlier in
+        // the DOM than the anchored result.
+        //
+        // Deliberately NOT gated on _resultIsAtOrAfterAnchor. That check belongs
+        // on the *anchored* result (it already runs in Phase 1 and in
+        // highlightWithFallback). Applying it here made the fallback unreachable
+        // in the only case it exists for: when the anchor overshot the target,
+        // the correct document-first occurrence is by definition *before* the
+        // anchor, so the gate rejected it and the wrong duplicate won.
         if (fallbackMarks.length > 0 &&
-            this._resultIsAtOrAfterAnchor(fallbackRes, searchStartAnchor) &&
             (anchoredMarks.length === 0 || isNodeBefore(fallbackMarks[0], anchoredMarks[0]))) {
             if (!inactive) {
                 anchoredNewMarks.forEach(m => {
@@ -350,7 +417,21 @@ export default class TextHighlighter {
             return returnResult ? null : false;
         }
 
+        // Floor for the shortening loop. Below roughly this many words a fragment
+        // is far more likely to be a coincidental match elsewhere on the page
+        // than the real text — a one-word fragment matches almost anything, which
+        // is what produced a stray highlighted "or" in an unrelated paragraph.
+        // When even this cannot be found, give up and let the caller fall back
+        // to a native selection over the correct text rather than mark the wrong
+        // word somewhere else.
+        const MIN_FRAGMENT_WORDS = 3;
+
         while (currentText.length > 0) {
+            if (currentText.trim().split(/\s+/).length < MIN_FRAGMENT_WORDS) {
+                console.log(`❌ Fragment too short to match safely: "${currentText}"`);
+                return returnResult ? null : false;
+            }
+
             const selection = {
                 status: 0,
                 fragment: {
@@ -375,7 +456,13 @@ export default class TextHighlighter {
             if (res.processedDirectives[0].length > 0) {
                 console.log(`✅ Highlight success for: "${currentText.substring(0, 50)}..."`);
                 if (remaining.trim().length > 0) {
-                    await this.highlightWithFallback(remaining, hasScrollOn, showHighlight, sentenceIndex, searchStartAnchor, inactive, returnResult);
+                    // Resume from just after the fragment we actually matched.
+                    // Re-using the original anchor here re-searched the whole
+                    // rest of the page for the tail, so the leftover words were
+                    // matched against unrelated text and landed as scattered
+                    // single-word highlights instead of finishing this sentence.
+                    const tailAnchor = this._captureAnchorAfterResult(res) || searchStartAnchor;
+                    await this.highlightWithFallback(remaining, hasScrollOn, showHighlight, sentenceIndex, tailAnchor, inactive, returnResult);
                 }
                 return returnResult ? res : true;
             } else {
@@ -633,7 +720,11 @@ export default class TextHighlighter {
                 }
 
                 console.warn('⚠️ Primary highlighter failed entirely, using native selection fallback');
-                if (this.player.answerElement === null) return false;
+                // Truthy check, not `=== null`: answerElement is undefined on
+                // players that never resolved an article container, and letting
+                // that through threw on `topParent.textContent` instead of
+                // quietly skipping the highlight.
+                if (!this.player || !this.player.answerElement) return false;
                 let topParent = this.player.answerElement;
                 let s, range;
                 let strToSearch = utteranceText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

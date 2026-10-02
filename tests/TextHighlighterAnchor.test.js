@@ -223,3 +223,88 @@ describe('TextHighlighter auto-advance anchor behavior', () => {
         expect(document.getElementById('post1-body').contains(firstMark)).toBe(false);
     });
 });
+
+describe('TextHighlighter anchor candidates', () => {
+    beforeEach(() => {
+        setupGlobals();
+    });
+
+    // A hero section whose copy is broken up by <br> and nested divs, followed by
+    // card copy that reuses short words. This is the shape that produced a stray
+    // one-word highlight in an unrelated card on gadgets.muse.ai.
+    function buildSplitHeroPage() {
+        document.body.innerHTML = `
+            <div id="hero">
+                <p id="hero-p1">Get started by grabbing an <a href="#">SDK token</a> and one of our featured <a href="#">project ideas</a>. Then tinker and customize to your heart's delight.</p>
+                <p id="hero-p2">Or build support for an entirely new board<br>if that's more your thing.</p>
+            </div>
+            <div id="cards">
+                <div id="card-1">
+                    <h3>ESP32 Device SDK</h3>
+                    <p>Connect your ESP32 board to Muse through our open source SDK. Throw in a screen to show images, add audio in and out, <em>or</em> wire up other sensors.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    it('never anchors on hidden, script or extension-widget text after a mark', () => {
+        buildSplitHeroPage();
+
+        // Mark the first hero paragraph, then append the kinds of nodes that used
+        // to capture the anchor and push the next search past the real text.
+        const p1 = document.getElementById('hero-p1');
+        const mark = document.createElement('mark');
+        mark.textContent = 'Then tinker and customize to your heart\u2019s delight.';
+        p1.appendChild(mark);
+        window.VR_Reader.savedMarkElements = [mark];
+
+        const decoy = document.createElement('div');
+        decoy.innerHTML = `
+            <script id="decoy-script">window.__tracker = "or build support";</script>
+            <style id="decoy-style">.or { color: red; }</style>
+            <div id="decoy-hidden" style="display:none">or build support for an entirely new board</div>
+            <div id="decoy-aria" aria-hidden="true">or build support for an entirely new board</div>
+            <div id="vrr-widget-toast">or build support for an entirely new board</div>
+            <p id="hero-p2">Or build support for an entirely new board<br>if that's more your thing.</p>
+        `;
+        document.body.appendChild(decoy);
+
+        const highlighter = new TextHighlighter(mockPlayer([]));
+        const anchor = highlighter.captureHighlightAnchor();
+
+        expect(anchor).not.toBeNull();
+        expect(anchor.node.textContent).toContain('Or build support');
+
+        // The anchor must not come from any of the decoy containers.
+        for (const id of ['decoy-script', 'decoy-style', 'decoy-hidden', 'decoy-aria', 'vrr-widget-toast']) {
+            const el = document.getElementById(id);
+            expect(el.contains(anchor.node)).toBe(false);
+        }
+    });
+
+    it('does not reduce a block-straddling sentence to a lone stop word in an unrelated card', async () => {
+        buildSplitHeroPage();
+
+        // The queue sentence as the page reader produces it: the <br> makes the
+        // matcher split the block group, so the whole sentence can never match.
+        const straddling = "Or build support for an entirely new board if that's more your thing.";
+        const player = mockPlayer([straddling]);
+        const highlighter = new TextHighlighter(player);
+
+        window.VR_Reader.savedMarkElements = [];
+        globalThis.activeOverlayElements = [];
+
+        await highlightSentence(highlighter, straddling, 0, null);
+
+        const marks = window.VR_Reader.savedMarkElements;
+        const markedText = marks.map(m => m.textContent).join('').trim();
+        const markedWords = markedText ? markedText.split(/\s+/) : [];
+
+        // The regression was a single stray word matched inside #card-1.
+        const strayInCard = marks.some(m => document.getElementById('card-1').contains(m));
+        expect(strayInCard).toBe(false);
+
+        // And nothing shorter than the 3-word floor should ever be marked.
+        expect(markedWords.length).not.toBe(1);
+    });
+});
