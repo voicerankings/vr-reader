@@ -10,6 +10,24 @@ const GEMINI_PCM_SAMPLE_RATE = 24000;
 const GEMINI_MP3_BITRATE = 96;
 const PCM_CHUNK_SAMPLES = 1152;
 
+/**
+ * Gemini 3.8's 30 studio voices are capitalised in Google's own docs and in
+ * OpenRouter's voice list ("Achernar", "Puck", "Sulafat"), but the 3.8 rows in
+ * our catalogue store them lower-case ("achernar"). Sending that verbatim fails
+ * to resolve a voice, so bare single-word names are capitalised here.
+ *
+ * Only a single purely-alphabetic token is touched. Every other id form is left
+ * exactly as stored: the Extended Voice Library ids are hyphenated
+ * ("ar-001-advisor-1"), and Voice Design ids are prefixed ("voice_...").
+ */
+function normalizeGemini38Voice(voice) {
+    if (typeof voice !== 'string') return voice;
+    const trimmed = voice.trim();
+    if (!trimmed) return trimmed;
+    if (!/^[a-z]+$/i.test(trimmed)) return trimmed;
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 export const providerInfo = {
     serviceNames: [
         'gemini-3-1-flash-tts', 'gemini-3-1-flash-tts-vd',
@@ -42,36 +60,38 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
         finalVoice = speakerId.split('--')[0];
     }
 
+    if (isGemini38) {
+        finalVoice = normalizeGemini38Voice(finalVoice);
+    }
+
     const languageCode = serviceOptions.languageCode || 'en-US';
 
     const isOpenRouter = customOptions.apiKeyProvider && customOptions.apiKeyProvider.includes('openrouter.com');
     const isGoogleGenAi = customOptions.apiKeyProvider && customOptions.apiKeyProvider.includes('generativelanguage.googleapis.com');
 
     if (isOpenRouter && !isGemini25) {
+        // Both Gemini models on OpenRouter only accept response_format=pcm and
+        // reject anything else ("Gemini TTS only supports response_format=pcm.
+        // Got mp3."), so both are encoded to MP3 locally afterwards. They differ
+        // only in how delivery instructions are expressed and in the model id.
+        let openrouterModel = OPENROUTER_MODEL;
+        let openrouterInput;
+
         if (isGemini38) {
             // 3.8 reads the input as a verbatim transcript and has no structured
             // prompt form. OpenRouter's OpenAI-shaped payload carries no
             // speech_metadata field, so delivery instructions ride along as a
             // leading inline vocal tag instead.
+            openrouterModel = OPENROUTER_MODEL_3_8;
             const style = buildGeminiInstructions(serviceOptions, customOptions);
-            const input = style ? `[${style}] ${text}` : text;
-            const audioBuffer = await openrouterTTS({
-                model: OPENROUTER_MODEL_3_8,
-                text: input,
-                voice: finalVoice,
-                apiKey,
-                responseFormat: 'mp3'
-            });
-            return {
-                audioData: arrayBufferToBase64(audioBuffer),
-                speechMarks: includeAudioTimestamps ? await getExternalTimestamps(audioBuffer) : null
-            };
+            openrouterInput = style ? `[${style}] ${text}` : text;
+        } else {
+            openrouterInput = buildStructuredPrompt(text, serviceOptions, customOptions);
         }
 
-        const promptText = buildStructuredPrompt(text, serviceOptions, customOptions);
         const audioBuffer = await openrouterTTS({
-            model: OPENROUTER_MODEL,
-            text: promptText,
+            model: openrouterModel,
+            text: openrouterInput,
             voice: finalVoice,
             apiKey,
             responseFormat: 'pcm'
