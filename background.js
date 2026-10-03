@@ -230,6 +230,30 @@ let popupWindow = null;
 let tabIdToUrl = {};
 let pendingReadLaterTabs = {};
 
+/**
+ * Posts to the side panel if there is a live port.
+ *
+ * A port held by this worker can be dead without being null: the service worker
+ * restarts while the panel document stays open, which tears the old port down
+ * and leaves the restarted worker holding no reference at all. Either way
+ * postMessage throws, and an exception here would discard a response the caller
+ * is still waiting on -- which is how a completed TTS request left the Test Key
+ * spinner running forever.
+ *
+ * @returns {boolean} true when the message was handed to a live panel port
+ */
+function postToSidePanel(message) {
+  if (!sidePanelPort) return false;
+  try {
+    sidePanelPort.postMessage(message);
+    return true;
+  } catch (e) {
+    console.warn('Side panel port is dead, dropping message:', message && message.key, e);
+    if (typeof sidePanelPort === 'object') setSidePanelPort(null);
+    return false;
+  }
+}
+
 chrome.runtime.onConnect.addListener(port => {
   if (port.name === "sidepanel-opened-port") {
     port.postMessage({
@@ -260,15 +284,29 @@ chrome.runtime.onConnect.addListener(port => {
   }
 
   port.onDisconnect.addListener(function () {
-    let tabId = port.sender.tab.id;
+    // A side panel is not tab-hosted, so port.sender.tab is undefined for its
+    // port. Reading port.sender.tab.id unconditionally threw inside this
+    // listener, which meant sidePanelPort was never cleared and went on
+    // pointing at a dead port that later postMessage calls would throw on.
+    const tabId = port.sender && port.sender.tab ? port.sender.tab.id : undefined;
 
-    if (sidePanelPort) {
+    if (port.name === "sidepanel-opened-port") {
+      // Only clear it if this really was the live port; a newer panel may have
+      // already replaced it.
+      if (sidePanelPort === port) {
+        setSidePanelPort(null);
+      }
+      return;
+    }
+
+    if (tabId !== undefined) {
       deleteActiveTabUsingSidePanel(tabId);
+    }
 
-      if (popupWindow && popupWindow.tabs[0] && popupWindow.tabs[0].id === tabId)
-        sidePanelPort.postMessage({
-          key: "login-fail",
-        });
+    if (sidePanelPort && popupWindow && popupWindow.tabs[0] && popupWindow.tabs[0].id === tabId) {
+      sidePanelPort.postMessage({
+        key: "login-fail",
+      });
     }
   });
   port.onMessage.addListener(async message => {
@@ -365,17 +403,17 @@ const MESSAGE_HANDLERS = {
   },
   'getAudioDataFromExternalTTS': async (request, sender) => {
     let data = await VRR_Requests.getAudioDataFromExternalTTS(request.payload);
-    if (request.callbackID && request.callbackID.startsWith('sidepanel_premium_tts') && sidePanelPort) {
-      sidePanelPort.postMessage({ key: 'load-audio', data, callbackID: request.callbackID });
-    } else {
-      await sendActionWithFallback('VRR_Requests', data, request.callbackID, resolveTabId(request, sender), sender);
+    if (request.callbackID && request.callbackID.startsWith('sidepanel_premium_tts') &&
+        postToSidePanel({ key: 'load-audio', data, callbackID: request.callbackID })) {
+      return;
     }
+    await sendActionWithFallback('VRR_Requests', data, request.callbackID, resolveTabId(request, sender), sender);
   },
   'saveChat': async (request, sender) => {
     let data = await VRR_Requests.saveChat(request.payload);
     await sendActionWithFallback('VRR_Requests', data, request.callbackID, null, sender);
-    if (request.callbackID && request.callbackID.startsWith('save_chat') && sidePanelPort) {
-      sidePanelPort.postMessage({ key: 'saveChat' });
+    if (request.callbackID && request.callbackID.startsWith('save_chat')) {
+      postToSidePanel({ key: 'saveChat' });
     }
   },
   'getDomainFilters': async (request, sender) => {

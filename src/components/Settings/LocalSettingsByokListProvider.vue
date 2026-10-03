@@ -32,6 +32,10 @@ const isKeySaved = ref(false);
 
 const isTesting = ref(false);
 const showTestModal = ref(false);
+
+// Guards the Test Key spinner against a response that never arrives.
+const TEST_TIMEOUT_MS = 45000;
+const testTimeoutHandle = ref(null);
 const testStatus = ref('loading');
 const testMessage = ref('');
 const testAudioBlobURL = ref(null);
@@ -262,6 +266,19 @@ async function testApiKey() {
   const callbackID = `sidepanel_premium_tts_${props.service.storage_key}_${Date.now()}`;
   const testText = `This API Key for ${props.service.voice_service} is working!`;
 
+  // Backstop. If the response never comes back the panel would otherwise spin
+  // on "Testing API key..." indefinitely, with no way for the user to tell
+  // whether the key is bad or the request just never arrived.
+  clearTimeout(testTimeoutHandle.value);
+  testTimeoutHandle.value = setTimeout(() => {
+    if (isTesting.value) {
+      isTesting.value = false;
+      testStatus.value = 'error';
+      testMessage.value = 'Timed out waiting for the provider to respond. Check your connection and try again.';
+      clearTimeout(testTimeoutHandle.value);
+    }
+  }, TEST_TIMEOUT_MS);
+
   const payload = {
     serviceName: props.service.voice_service,
     serviceOptions: {
@@ -294,6 +311,7 @@ async function testApiKey() {
     // `errorMessage`, which is never set, so the generic fallback always won.
     saveRequest(callbackID, async ({ audioData, status, message, errorMessage }) => {
       isTesting.value = false;
+      clearTimeout(testTimeoutHandle.value);
 
       if (status === "error") {
         testStatus.value = 'error';

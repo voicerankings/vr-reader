@@ -385,12 +385,27 @@ async function copyTextToClipboardFallback(text) {
   document.body.removeChild(textarea);
 }
 
+let _sidePanelPort = null;
+let _sidePanelHooksInstalled = false;
 
-function sidePanelPort() {
-
-
+/**
+ * Opens the port the background uses to push results into the side panel.
+ * Idempotent: returns the existing port when it is still alive.
+ */
+function connectSidePanelPort() {
+  if (_sidePanelPort) {
+    try {
+      // postMessage on a dead port throws, which is the cheapest way to tell
+      // whether the background service worker restarted under us.
+      _sidePanelPort.postMessage({ key: 'ping' });
+      return _sidePanelPort;
+    } catch (e) {
+      _sidePanelPort = null;
+    }
+  }
 
   const port = chrome.runtime.connect({ name: "sidepanel-opened-port" });
+
   port.onMessage.addListener(async (message) => {
 
     const { key, value, data, tab_id, callbackID } = message;
@@ -427,10 +442,38 @@ function sidePanelPort() {
 
 
 
+
     if (key === "route" && value !== "") {
       handleRouteMessage(value, data);
     }
-  })
+  });
+
+  port.onDisconnect.addListener(() => {
+    if (_sidePanelPort === port) _sidePanelPort = null;
+  });
+
+  _sidePanelPort = port;
+  return port;
+}
+
+
+function sidePanelPort() {
+
+  connectSidePanelPort();
+
+  if (_sidePanelHooksInstalled) return;
+  _sidePanelHooksInstalled = true;
+
+  // An MV3 service worker is torn down after ~30s idle, which disconnects this
+  // port and leaves the background holding no side-panel port at all. From that
+  // point on every response destined for the panel is routed to a content
+  // script instead, so callers here wait forever and the UI spins with no error.
+  // Reconnecting whenever the panel becomes visible again closes that window.
+  const reconnect = () => {
+    if (document.visibilityState === 'visible') connectSidePanelPort();
+  };
+  document.addEventListener('visibilitychange', reconnect);
+  window.addEventListener('focus', reconnect);
 }
 
 /**
