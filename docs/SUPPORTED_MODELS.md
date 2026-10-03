@@ -39,7 +39,7 @@ Sign up for an account with the provider and paste the API key it gives you into
 | **AsyncAI** | `ASYNCAI_API_KEY` | `async_flash_v1.0`,`async_flash_v1.5`, `async_pro_v1.0` | [voice list](https://voicerankings.com/filters?service=AsyncAI) |
 | **Resemble AI** | `RESEMBLEAI_API_KEY` | Your custom cloned voice UUIDs | [voice list](https://voicerankings.com/filters?service=ResembleAI) |
 | **Deepgram Flux** | `DEEPGRAM_FLUX_API_KEY` | `flux-{voice}-{language}` voices, e.g. `flux-hannah-en` | [voice list](https://voicerankings.com/filters?service=Deepgram-Flux) |
-| **Gemini 3.8 Flash TTS / extended / vd** | `GEMINI_3_8_FLASH_TTS_API_KEY` | `gemini-3.8-flash-tts` (Gemini API or OpenRouter only) | [voice list](https://voicerankings.com/filters?service=gemini-3-8-flash-tts) |
+| **Gemini 3.8 Flash TTS / extended / vd** | `GEMINI_3_8_FLASH_TTS_API_KEY` | `gemini-3.8-flash-tts` or `gemini-3.8-flash-lite-tts` (pick in **Model**) — Gemini API or OpenRouter only | [voice list](https://voicerankings.com/filters?service=gemini-3-8-flash-tts) |
 | **Speechify Simba 3.2** | `SPEECHIFY_SIMBA_3_2_API_KEY` | `simba-3.2` | [voice list](https://voicerankings.com/filters?service=Speechify-Simba-3-2) |
 | **Murf Falcon 2** | `MURFAI_FALCON_2_API_KEY` | `falcon-2` (streaming) | [voice list](https://voicerankings.com/filters?service=MurfAI-Falcon-2) |
 | **Inworld TTS 2** | `INWORLD_TTS_2_API_KEY` | `inworld-tts-2` | [voice list](https://voicerankings.com/filters?service=inworld-tts-2) |
@@ -66,6 +66,7 @@ One **OpenRouter** API key (`https://openrouter.ai`) provides access to all of t
 | `deepgram/aura-2` | Deepgram Aura 2 |
 | `google/gemini-3.1-flash-tts-preview` | Google Gemini 3.1 Flash TTS |
 | `google/gemini-3.8-flash-tts` | Google Gemini 3.8 Flash TTS |
+| `google/gemini-3.8-flash-lite-tts` | Google Gemini 3.8 Flash-Lite TTS |
 | `deepgram/flux-tts` | Deepgram Flux TTS |
 | `x-ai/grok-voice-tts-1.0` | Grok TTS |
 | `microsoft/mai-voice-2` | Microsoft MAI Voice 2 |

@@ -4,11 +4,31 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 const GEMINI_MODEL = 'gemini-3.1-flash-tts-preview';
 const GEMINI_2_5_MODEL = 'gemini-2.5-flash-preview-tts';
 const GEMINI_3_8_MODEL = 'gemini-3.8-flash-tts';
+const GEMINI_3_8_FLASH_LITE_MODEL = 'gemini-3.8-flash-lite-tts';
 const OPENROUTER_MODEL = 'google/gemini-3.1-flash-tts-preview';
-const OPENROUTER_MODEL_3_8 = 'google/gemini-3.8-flash-tts';
+const GEMINI_3_8_MODELS = [GEMINI_3_8_MODEL, GEMINI_3_8_FLASH_LITE_MODEL];
 const GEMINI_PCM_SAMPLE_RATE = 24000;
 const GEMINI_MP3_BITRATE = 96;
 const PCM_CHUNK_SAMPLES = 1152;
+
+/**
+ * Resolves which Gemini 3.8 model to synthesize with. Flash and Flash-Lite take
+ * the identical request shape and the same 30 studio voices; they differ in
+ * price, latency and language coverage (130 vs 101), so the choice is exposed
+ * as a BYOK model select the same way MurfAI, OpenAI and Speechify do it.
+ *
+ * Falls back to what the saved apiKeyProvider implies, so anyone who set the
+ * route before this option existed keeps the model they had.
+ */
+function resolveGemini38Model(customOptions = {}) {
+    const chosen = String(customOptions.model || '').trim().toLowerCase();
+    if (GEMINI_3_8_MODELS.includes(chosen)) return chosen;
+
+    if (String(customOptions.apiKeyProvider || '').includes('flash-lite')) {
+        return GEMINI_3_8_FLASH_LITE_MODEL;
+    }
+    return GEMINI_3_8_MODEL;
+}
 
 /**
  * Gemini 3.8's 30 studio voices are capitalised in Google's own docs and in
@@ -50,7 +70,7 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
         model = GEMINI_2_5_MODEL;
     } else if (isGemini38) {
         storageKey = 'GEMINI_3_8_FLASH_TTS_API_KEY';
-        model = GEMINI_3_8_MODEL;
+        model = resolveGemini38Model(customOptions);
     }
 
     const apiKey = await getApiKey(storageKey, userApiKey);
@@ -82,7 +102,7 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
             // prompt form. OpenRouter's OpenAI-shaped payload carries no
             // speech_metadata field, so delivery instructions ride along as a
             // leading inline vocal tag instead.
-            openrouterModel = OPENROUTER_MODEL_3_8;
+            openrouterModel = `google/${model}`;
             const style = buildGeminiInstructions(serviceOptions, customOptions);
             openrouterInput = style ? `[${style}] ${text}` : text;
         } else {
@@ -127,7 +147,7 @@ async function handle({ text, serviceOptions, userApiKey, customOptions = {}, se
     if (isGemini38) {
         // Gemini 3.8 is served by the Gemini API only; there is no Cloud
         // Text-to-Speech (text:synthesize) model for it.
-        const error = new Error('Gemini 3.8 Flash TTS is only available through the Gemini API or OpenRouter. Set the API Key Provider option for this service.');
+        const error = new Error(`Gemini 3.8 (${model}) is only available through the Gemini API or OpenRouter. Set the API Key Provider option for this service.`);
         error.requestPayload = { model, voice: finalVoice };
         throw error;
     }
