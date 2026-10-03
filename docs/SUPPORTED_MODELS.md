@@ -1,17 +1,17 @@
-﻿# ðŸ”Š Supported TTS Models & Providers
+# 🔊 Supported TTS Models & Providers
 
 This guide lists every text-to-speech (TTS) model and provider supported by **VoiceRankings Reader**, and how each one obtains its API key.
 
-- ðŸ§© **Single Provider Key** â€” sign up directly with the provider and use its own API key.
-- ðŸŽŸï¸ **One Key, Multiple Providers (Aggregator)** â€” a single API key unlocks models from many different vendors at once.
+- 🧩 **Single Provider Key** — sign up directly with the provider and use its own API key.
+- 🎟️ **One Key, Multiple Providers (Aggregator)** — a single API key unlocks models from many different vendors at once.
 
 Voice previews and the full, day-to-day list of available voices are served from the [VoiceRankings](https://voicerankings.com) voice catalog.
 
 ---
 
-## ðŸ§© Single Provider Key
+## 🧩 Single Provider Key
 
-Sign up for an account with the provider and paste the API key it gives you into **Settings**. The key is stored locally in `chrome.storage.local` â€” it is **never** sent to VoiceRankings servers.
+Sign up for an account with the provider and paste the API key it gives you into **Settings**. The key is stored locally in `chrome.storage.local` — it is **never** sent to VoiceRankings servers.
 
 | Provider | Settings Key | Models | Voice List
 | :--- | :--- | :--- | :--- |
@@ -53,9 +53,9 @@ Sign up for an account with the provider and paste the API key it gives you into
 
 ---
 
-## ðŸŽŸï¸ One Key, Multiple Providers (Aggregator)
+## 🎟️ One Key, Multiple Providers (Aggregator)
 
-Sign up for **one** account with an aggregator and use that single API key to access models from many different vendors â€” no per-provider accounts needed.
+Sign up for **one** account with an aggregator and use that single API key to access models from many different vendors — no per-provider accounts needed.
 
 ### OpenRouter
 
@@ -74,7 +74,7 @@ One **OpenRouter** API key (`https://openrouter.ai`) provides access to all of t
 | `canopylabs/orpheus-3b-0.1-ft` | Canopy Labs Orpheus |
 | `hexgrad/kokoro-82m` | Kokoro |
 
-> ðŸ”§ **Any OpenRouter model can be used.** Enter the key in Settings as `openrouter.com/<model-id>` and the extension routes all matching providers through that model (e.g. `openrouter.com/deepgram/aura-2`, `openrouter.com/google/gemini-3.1-flash-tts-preview`).
+> 🔧 **Any OpenRouter model can be used.** Enter the key in Settings as `openrouter.com/<model-id>` and the extension routes all matching providers through that model (e.g. `openrouter.com/deepgram/aura-2`, `openrouter.com/google/gemini-3.1-flash-tts-preview`).
 
 OpenRouter also powers optional word-level **speech timing** (STT) for playback highlighting, including `openai/gpt-transcribe`, `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1`, `openai/whisper-large-v3`, `openai/whisper-large-v3-turbo`, `x-ai/grok-stt-1.0`, `mistralai/voxtral-mini-transcribe`, and `qwen/qwen3-asr-flash-2026-02-10`.
 
@@ -88,11 +88,11 @@ One **DeepInfra** API key (`https://deepinfra.com`) provides access to the follo
 | `canopylabs/orpheus-3b-0.1-ft` | Canopy Labs Orpheus |
 | `mimo-v2.5-tts` | Xiaomi MiMo V2.5 |
 
-> ðŸ’¡ Only the models above are supported on DeepInfra â€” the extension calls each hardcoded inference endpoint directly.
+> 💡 Only the models above are supported on DeepInfra — the extension calls each hardcoded inference endpoint directly.
 
 ---
 
-## ðŸ”‘ Getting Keys & Where to Enter Them
+## 🔑 Getting Keys & Where to Enter Them
 
 1. Create an account on the provider's site and generate an API key.
    - Direct providers: sign up on each provider's dashboard (OpenAI, Deepgram, Azure, Google Cloud, Grok/xAI, Mistral, Qwen, StepFun, Rime, Speechify, Murf, Inworld, AsyncAI, Resemble, Xiaomi, Amazon).
